@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 10 is built and largely witnessed on real data** — the dashboard, the reveal, one polling loop proven against the network log, and deep links working after finding they need BOTH an SPA fallback AND `usePathUrlStrategy()`. **Step 9 remains code-complete with its end-to-end witness OWED (O-8)** — do not record it as done. OpenRouter free tier is 50 requests/day and was exhausted; it resets 2026-09-02 00:00 UTC.
+**Last updated:** 2026-09-01 · **Updated because:** **Step 11 is built and its central claim is witnessed** — two personas held a real 30-message date, events fired and the agents reacted to them, and a SIGKILLed server came back and CONTINUED the same date from `seq 3` rather than restarting it. Two defects were found doing it (D-010, D-011) and one instrumentation gap was closed. **The quota-fit spreadsheet (S11-G1) is below with measured numbers, and its answer is decisive: one full analysis costs ~171 model calls.** Also corrected below: **the "50 free calls a day" figure in the last PICKUP is wrong as stated** — see the quota section. **Step 9's end-to-end witness (O-8) is still OWED.**
 
 ---
 
@@ -32,7 +32,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: clear O-8 and O-9 after the quota resets, then Step 11 (date simulation).** Steps 1–8 are done and witnessed; **Step 9 is code-complete with its witness OWED**; Step 10 is built and largely witnessed. The fidelity gate is closed with its measurement recorded below.
+**Next: Step 12 (the judge), which closes the quota-fit gate.** Steps 1–8 and 10 are done and witnessed; **Step 9 is code-complete with its witness OWED (O-8)**; **Step 11 is built with its central claim (resume from checkpoint) witnessed live**, and four of its eight acceptance criteria still owed (O-10…O-13). The fidelity gate is closed with its measurement recorded below; the quota-fit gate is OPEN with its spreadsheet now filled in from measurement.
 
 ---
 
@@ -80,8 +80,9 @@ dating_app_ai\                      ← superproject
 | Step 8 UX + gate | **Witnessed** — profile cards with guess-vs-confirmed styling, one-tap confirm, calibration chat with flagging, settings; **fidelity gate CLOSED with a recorded measurement** | browser (release build) this session |
 | Step 9 matching | **Code complete, witness OWED (O-8)** — do not mark done | see O-8 |
 | Step 10 UX dashboard | **Witnessed** — hero, history, reveal with partial banner, Demo chip on 3 surfaces, ONE polling loop proven by the network log, deep links landing cold | browser (release build) this session |
-| Unit tests | **15 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up) | pytest output |
-| Lint / build | **one pre-existing ruff error**: `RUF100` unused `# noqa: E402` in `migrations/env.py` — untouched by recent work, not yet fixed; image rebuilt green after D-004 editable-install fix | in-container runs |
+| Step 11 simulation | **Built; the central claim WITNESSED.** A real analysis ran two 30-message dates end to end; a SIGKILLed API came back, reconciliation relaunched it, and the date logged `resumed_from_checkpoint … seq 3` and carried on. 4 of 8 ACs owed — see the table below | api logs + psql + transcript this session |
+| Unit tests | **63 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up + 14 matching math + 29 simulation rules + 5 backoff) | pytest output |
+| Lint / build | **GREEN, no outstanding errors.** The long-standing `RUF100` in `migrations/env.py` was removed 2026-09-01 — the suppression named `E402`, which this project does not enable, so the suppression was itself the only lint error in the repo. The reason it documented is kept as a plain comment | in-container `ruff check .` |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
 
 ## What was just finished (Step 5, all tickets)
@@ -242,11 +243,60 @@ dating_app_ai\                      ← superproject
 
 Fixing the server half first is exactly why the symptom survived into a second attempt looking unchanged. This closes the open question PICKUP has carried since Step 5.
 
+## What was just finished (Step 11 — date simulation, built and largely witnessed)
+
+**Server (S11-B1…B12):** migration `0006` (`dates`, `date_messages` verbatim from §3 — `analyses.progress` was already added by `0005`). `app/schemas/date_scenarios.py` — `date_scenarios.v1`. `app/simulation.py` — the whole module: scenario generation with the empty-intersection fallback, the turn loop, event injection, the give-up ladder, resume, the global semaphore, and progress. `app/routers/simulation.py` — `POST /analyses/{id}/simulate`, `GET /analyses/{id}/dates`, `GET /dates/{id}/transcript`. `app/reconcile.py` gains **step 3 of the pass**: on every boot, any analysis left in `matching` or `simulating` is relaunched.
+
+**Config:** the `scenario_generation` slot is FILLED (`dots-studio/dots-3-note-preview:free`), because with it empty there is no scenario, no date and no transcript. Provisional, like every other pin. **Three `free-model-of-choice` slots remain unfilled** (`chat_compaction` and the two that Steps 14–15 will need).
+
+**UX (not in the plan's task list, but named by it):** the Step 10 "Start Simulated Dates" button is **live**. `Analysis` gains `progress`, the repository gains `simulate()`, and the `simulating` phase now shows the SERVER's stage sentence rather than a placeholder. The button is also now **gated on `status == 'matched'`** — a finished analysis renders the same reveal, and a live button there could only ever earn a 409 (§11: gate the promise on the capability). `flutter analyze`: no issues.
+
+**Witnessed in the browser** (release build + `serve_build.py`, trap 3d — probes cannot see browser-only failures): a `complete` analysis renders "These dates have already run…" and no button; a `matched` analysis renders the live button; pressing it flipped the screen to the simulating phase, which then showed the SERVER's own sentences in sequence — "Working out where you and Alice would meet…" and then **"Simulating date 1 of 4 — Bob's garage…"**, which is exactly the shape S11-B10 specifies.
+
+**Unit tests: 63 pass** — 29 new in `tests/test_simulation_rules.py` pinning every rule the turn loop obeys, plus 5 in `tests/test_resilience_backoff.py`.
+
+### Things worth not re-deciding
+
+- **The transcript IS the state, and every rule is a pure function of it.** Whose turn it is, how many events have fired, whether the pair have started saying goodbye, which of the two endings finished the date — all recomputed from the stored rows on every pass. There is no in-flight object a restart could lose, which is *why* resume works rather than a bonus on top of it. It is also why 29 unit tests can pin behaviour that would otherwise need a live model to observe.
+- **Whose turn it is comes from the COUNT of agent messages, not from "who spoke last."** An environment row sits between two turns; if it were read as "the last speaker", the two agents would swap sides mid-date.
+- **The 30-message cap counts environment rows** (§18) and there is a unit test that constructs exactly that boundary — 27 spoken plus 3 events — because this is the rule someone later "fixes" into counting only what was said.
+- **There is no fourth retry loop in `simulation.py`.** The three attempts with backoff live in the resilience layer and the three validation repairs live in the Guard. A turn that still fails marks the DATE `incomplete` and the pipeline moves on. Adding a per-turn retry here would silently make it 27 attempts.
+- **`anchored_in_interest` is a required field on every generated setting.** It is what makes the empty-intersection fallback *checkable* — "one setting anchored in each person's interests" is otherwise a claim nobody can verify after the fact, which is exactly the shape §9 forbids: a derived value with no provenance.
+- **A candidate whose scenario generation fails is skipped, and NO date row is written for them.** A `dates` row needs a scenario, and a placeholder scenario would be a fabricated setting sitting in the database looking real.
+- **The analysis is driven to `complete` here, with `progress.stage = "dates_finished"` and `judged: false`.** Step 12 inserts judging *before* that transition and takes the transition over (S12-B10). Leaving it in `simulating` would spin a progress bar over finished work; claiming it was scored would be a lie.
+
+### Step 11 acceptance criteria — honest status
+
+| AC | Status |
+|---|---|
+| 1 a full simulation produces dates with real transcripts | **Witnessed on three separate analyses** — 6 dates in total, 136 stored messages, agents visibly reacting to injected events ("Power's out, so I'll grab the flashlight"). Every pool was `partial` (one candidate), so "up to 6 dates" is shown at 2 per analysis rather than 6 in one |
+| 2 killed mid-date, restarts, **continues from the last checkpointed message** | **Witnessed four times, and asserted by the green probe.** `probe_simulation_resume.py` SIGKILLs the API at 3 messages and then checks that the pre-kill prefix is present byte for byte in the same order and that the date GREW from it — `3 → 30`. The other three were: the same probe's earlier run, an accidental uvicorn reload mid-date (trap 3e, resumed at seq 17), and the AC5 fault injection (resumed at seq 11). Every one named the seq it resumed from and who was due to speak |
+| 3 event injection observed; max-3 and no-consecutive both observed holding | **Witnessed, and asserted by the green probe on every date it checks.** Every roll is logged with its value, the threshold, and the reason it did or did not fire; a date reached exactly 3 events and the next roll logged `reason: event_cap_reached`; the roll after each event logged `reason: no_consecutive_events`. Speaker pattern of one full date: `UCUECUCUCUCUCUCUCUCEUCUCUCUCEU` |
+| 4 a date ends by mutual `wants_to_end` at least once, and by cap at least once | **Both witnessed, both logged with which mechanism fired.** `cap` on four dates (`ended_by: cap`, 30 messages). `mutual_wants_to_end` on date `b6a54d43` at **25 messages** — and the closing exchange behaved exactly as designed: `seq 22` user_agent sets the flag, `seq 23` candidate_agent sets it, then EXACTLY two more turns, one goodbye each ("Let's call it a night. I've got that Raleigh waiting for me" / "it was nice meeting you… maybe we'll cross paths again"), and stop |
+| 5 a failure marks that date `incomplete` at its last good message and the pipeline continues | **Witnessed twice, once forced and once for real.** *Forced:* `date_simulation` pointed at `there-is/no-such-model:free` while date 2 sat at 11 messages — on relaunch it resumed at `seq 11`, the turn failed, and the row landed `incomplete, ended_by: turn_gave_up, failed_at_seq: 12, messages: 11, judgeable: true`; the analysis still completed (`dates_complete: 1, dates_incomplete: 1`). That fault was a permanent 400, so it failed fast rather than through the ladder. *Unforced, an hour later:* the real model emitted a degenerate whitespace loop, the **Guard spent all 3 validation attempts** (`outcome: gave_up`, raw output attached), the date went `incomplete` at `failed_at_seq: 21, messages: 20`, **and the pipeline moved straight on to date 2**. Between them, every half of this AC is observed |
+| 6 empty-intersection fallback produces two settings anchored one in each person's interests | **Unit-tested, not witnessed live — owed (O-13).** Needs a candidate pair sharing zero interest labels |
+| 7 the global semaphore of 2 limits three queued analyses | **Not witnessed — owed (O-14).** `simulation_slot_acquired … waited_ms` is logged on every run and read 0 both times, which is correct with one pipeline and proves nothing about the limit |
+| 8 the quota-fit spreadsheet exists with real numbers | **Done** — below, from measurement rather than estimate |
+
+### Two model findings from the live runs, worth carrying into Step 12
+
+**The natural ending is real but RARE, and it is late.** Across six dates only one ended itself. In the two completed dates observed first, `wants_to_end` was false on all 47 turns, which looked like the model simply never setting the field — it is not. It sets it, but usually not before the 30-message cap arrives. Practical consequence for the quota table below: **assume most dates cost the full 27 turns.** Do not "fix" the rarity by lowering the cap or by inferring an ending from low satisfaction — both would fabricate an ending the agents did not reach. If shorter dates are wanted, that is a model or prompt question and it belongs with the quota-fit gate.
+
+**`connection` and `satisfaction` are used unevenly and are often 0.** One date ranged 0–100 with a genuine peak; another never left 0–10; long stretches sit flat at 0 while the transcript reads perfectly engaged. **Step 13's per-turn curves should be designed against real stored data, not against the 0–100 range the schema promises.** The judge (Step 12) reads the transcript rather than these numbers, so scoring is not affected — but anyone plotting them will be surprised.
+
+**One more thing the wire did on its own:** mid-date, `dots-3-note-preview` emitted a degenerate whitespace loop — a JSON object that opened `"connection":` and then produced thousands of newlines until it hit `max_tokens`. The Guard spent its three validation attempts, gave up with the raw output attached, and the date ended `incomplete` at its last good message while the pipeline moved on. This is the give-up ladder working, and it is worth knowing that this model does that.
+
 ## What is next
 
-**Two owed witnesses first, both cheap once quota resets (2026-09-02 00:00 UTC):** O-8 (Step 9's clean probe run) and O-9 (Step 10's `no_candidates` screen). Then **Step 11 — date simulation**, which opens the quota gate and is the most quota-hungry step in the plan; read the measured quota numbers below before starting it.
+**Step 12 — the judge — is next**, and it CLOSES the quota-fit gate. Read the spreadsheet below before starting: one full analysis is ~171 model calls and ~24 minutes, and S12-G1 asks for one of those end to end without exhausting a cap.
 
-Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality), `carol@dating-test.dev` (no answers), plus disposable probe users.
+**Six owed witnesses are cheap to clear alongside it**, and five of them are Step 11's own (O-10…O-14) — all of them need the same thing, a candidate pair and a few minutes of quota. O-8 (Step 9's clean probe run) and O-9 (Step 10's `no_candidates` screen) are still open from previous steps.
+
+**One thing to settle with the owner before Step 12 pushes further:** `config/ai.yaml` currently routes `trait_extraction` to `dots-3-note-preview`, but the comment directly above that line — and the D-008 write-up — say it was deliberately moved to `nemotron-3-super` *because* dots started 400ing that task. The change is uncommitted and undated, so it is impossible to tell from the repo whether it was a re-measurement or a slip. §23 says decided things stay decided; this one currently reads both ways. **Nothing in Step 11 depends on it** — scenario generation and date simulation have their own pins, and both worked.
+
+**Two test accounts were opted OUT of the pool this session to keep probe runs cheap** and have NOT been restored: `bob@dating-test.dev` and every `probe-onboard-*` user. Opt bob back in before any matching witness that expects him.
+
+Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality; **opt_in currently FALSE**), `carol@dating-test.dev` (no answers), plus disposable probe users.
 
 Useful facts for later steps, learned witnessing Step 2:
 - `gemini-3.6-flash` is a **thinking model** — a tight `max_tokens` gets eaten by reasoning and yields `MAX_TOKENS` with no text. Give generous budgets.
@@ -259,7 +309,8 @@ Useful facts for later steps, learned witnessing Step 2:
 |---|---|---|
 | Native desktop witness (O-4) | **Owner:** enable Windows Developer Mode, then `flutter run -d windows` in `ux\` | Unchanged from last session |
 | OpenRouter `free-model-of-choice` slots | **Owner decision, deferred by design** — EXCEPT `dispute_followups`, filled 2026-09-01 with `nvidia/nemotron-3.5-lightning:free` so Step 6 AC4 could be witnessed. Four slots remain unfilled | Probe takes a model as an argument precisely so the slots stay unfilled |
-| Paid-balance question | **Owner**, from the quota-fit numbers | Unchanged |
+| Paid-balance question | **Owner**, and the numbers are now in | **Decisive.** One full analysis = ~171 openrouter calls. On the free tier as documented (50/day) the product's core loop cannot run ONCE. 10 credits raises the allowance to 1000/day ≈ 5 analyses/day. See the spreadsheet below |
+| `trait_extraction` routing | **Owner:** confirm whether the move back to `dots-3-note-preview` was intended | The file and its own D-008 comment disagree; the change is uncommitted and undated |
 | Hosting / CORS / auth posture | **Owner, explicitly deferred** | Unchanged (decision log #11) |
 
 ## Traps that will bite you resuming cold
@@ -288,6 +339,11 @@ Useful facts for later steps, learned witnessing Step 2:
 12d. **Debug provider faults by isolation, not by theory.** Three plausible explanations (schema too big, max_tokens, prompt size) were each falsified in about a minute by a script varying one factor at a time. Reasoning about them would have taken longer and settled nothing.
 13. **Ruff's `EXE002` is suppressed on purpose** — through the Windows bind mount every file looks executable; do not "fix" it by chmod.
 14. **Decided things stay decided** (§23).
+15. **`log_event` has reserved field names, and nothing warns you until that line runs** (D-010). Its signature is `log_event(logger, event, *, level, **fields)`, so `logger=`, `event=` and `level=` cannot be used as log FIELDS anywhere in the codebase. `event=chosen` in the event-injection line raised `TypeError` from inside the logging call and killed a pipeline **after** it had already spent a scenario call. Lint cannot see it; `**kwargs` keeps the call legal until execution.
+16. **A JSONB column stores Python `None` as the JSON value `null`, not SQL NULL, unless you say `JSONB(none_as_null=True)`** (D-011). `date_messages.state` did exactly this: environment rows looked null in every JSON payload and every Python read, while failing `state IS NULL` in SQL. Step 12's judging filters spoken turns on precisely that predicate. Both `date_messages.state` and `analyses.progress` now set it; any new JSONB column whose NULL means something must too.
+17. **`probe_simulation_resume.py` runs on the HOST, not in the container**, and it is the only probe that does. It has to kill the api container, and `docker compose exec` processes die *with* the container — a probe that kills the API from inside kills itself mid-assertion. It uses stdlib `urllib` for the same reason (no project virtualenv on the host). Its default run stops once resume is proven; `--full` waits for every date and costs a full analysis.
+18. **A rate-limited call now takes ~50 seconds to fail, on purpose.** Rate limits get their own backoff schedule (20 s, 30 s) separate from the 2 s/4 s used for dropped connections, because every quota this project meets is per-minute or per-day and three retries inside seven seconds all land in the same blocked window. A slow failure is the intended behaviour, not a hang.
+19. **The `dates` rows are created BEFORE any turn runs, and re-running a pipeline reuses them.** That is what makes resume free — but it also means a failed run leaves date rows behind, and re-triggering `POST /simulate` will NOT regenerate the scenarios. To start genuinely fresh, delete the analysis's `dates` rows first.
 
 ## Owed measurements (§4)
 
@@ -300,8 +356,11 @@ Useful facts for later steps, learned witnessing Step 2:
 | O-7 | The fidelity gate re-run **by the owner on the owner's own account**. The gate asks you to count lines *you* would never say; this session could only assess against the account's written answers | Step 8, **2026-09-01** | Owner | **Owed** |
 | O-8 | Step 9's end-to-end witness: ONE clean `probe_matching_filters.py` run from an empty probe pool. The only GREEN run this session was polluted (concurrent runs sharing an output file; stale probe users in the pool; `shared_interests` vacuous under D-009) | Step 9, **2026-09-01** | A single clean run after the OpenRouter daily cap resets (2026-09-02 00:00 UTC) | **Owed** |
 | O-9 | Step 10's `no_candidates` screen and the remaining empty states rendered in a browser. The code paths exist and `partial` was witnessed; the empty pool was not reproduced this session | Step 10, **2026-09-01** | Toggle the only candidate's `opt_in` off and re-run | **Owed** |
+| O-13 | Step 11 AC6: the empty-intersection fallback observed live, producing two settings whose `anchored_in_interest` values come one from each person's list. Unit-tested both branches; never run against a real pair sharing zero interests | Step 11, **2026-09-01** | Match two people with no overlapping interest labels | **Owed** |
+| O-14 | Step 11 AC7: the global semaphore of 2 observed limiting three queued analyses. `simulation_slot_acquired … waited_ms` logs on every run and read 0 both times, which proves nothing | Step 11, **2026-09-01** | Three users with matched analyses, simulated at once | **Owed** |
+| O-15 | Matching embeds the requester and every candidate in a tight sequential loop, which walks straight into google's per-MINUTE embedding cap. The retry schedule now survives the window (fixed this session); the loop still enters it | Step 11, **2026-09-01** | Space or batch the embed calls in `app/matching.py` | **Owed** |
 
-*(O-1 closed 2026-09-01 — `opt_in` was observed removing and restoring a candidate in someone else's pool. O-2 closed 2026-09-01 — the pinned-snapshot assertion is enabled in `probe_answer_edit.py` (S9-P2). Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
+*(O-10, O-11 and O-12 were incurred and closed within the same session and is deleted per the queue rule: O-10 closed on the third run of `probe_simulation_resume.py`, GREEN at 23/23; O-11 closed when a sixth date ended itself by mutual `wants_to_end` at 25 messages with a clean two-line goodbye; O-12's narrowed halves — a transient fault exhausting the 3-attempt ladder, and the pipeline starting the next date after an incomplete one — were both observed unforced when the model emitted a degenerate whitespace loop mid-date.) (O-1 closed 2026-09-01 — `opt_in` was observed removing and restoring a candidate in someone else's pool. O-2 closed 2026-09-01 — the pinned-snapshot assertion is enabled in `probe_answer_edit.py` (S9-P2). Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
 ## Probe status (§2)
 
@@ -312,32 +371,83 @@ Useful facts for later steps, learned witnessing Step 2:
 | `probe_ai_smoke.py` (helper, not in the §2 minimum set) | **GREEN** (2026-09-01; openrouter model passed as argument) |
 | `probe_answer_edit.py` | **GREEN** (2026-09-01, S6-P1/P2 — real AI calls) |
 | `probe_onboarding.py` | **GREEN** (2026-09-01, S7-P1 — 16 checks, real AI calls) |
-| All others (`matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 9–15 |
+| `probe_matching_filters.py` | Written (S9-P1); **the one clean run is still OWED (O-8)** |
+| `probe_simulation_resume.py` | **GREEN — 23/23** (2026-09-01, S11-P1, real AI calls, ~13 minutes). It took three runs to get there and the first two failed on the PROBE, not the code: an uncaught Windows socket abort when it killed the API, then a `UnicodeEncodeError` printing its own verdict on a legacy-code-page console. Both fixed. The recorded green run waited for the whole analysis, which is what `--full` now selects; the 23 assertions are unchanged by that gating |
+| All others (`judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 12–15 |
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation + **quota gate opens** ← **next** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation **(built; resume WITNESSED; O-10…O-13 owed)** + **quota gate OPEN with its spreadsheet filled** · 12 Judge + **quota gate closes** ← **next** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 
 | Gate | Closes in | Status |
 |---|---|---|
 | Fidelity transfer | Step 8 | **CLOSED 2026-09-01** — see the measurement below |
-| Quota fit | Step 11 → 12 | **Open — but the decisive number is now measured, see below** |
+| Quota fit | Step 11 → 12 | **OPEN, spreadsheet FILLED 2026-09-01 (S11-G1).** The end-to-end run in Step 12 closes it. Its answer is already decisive — see below |
 
-### Quota reality, measured 2026-09-01 (feeds the quota-fit gate)
-
-Both free tiers were hit to exhaustion in one working day:
+### Quota reality, measured (feeds the quota-fit gate)
 
 | Provider | Limit | Evidence |
 |---|---|---|
-| **OpenRouter free models** | **50 requests per DAY, account-wide** | `429 {"message":"Rate limit exceeded: free-models-per-day"}`, `X-RateLimit-Limit: 50`, `X-RateLimit-Remaining: 0`. Resets 2026-09-02 00:00 UTC. **It is account-wide, not per model** — switching between `dots-3-note-preview` and `nemotron-3-super` made no difference, which is how it was identified. |
+| **OpenRouter free models** | documented as 50/day account-wide — **but see the correction below; measured behaviour does not match** | Step 9 and Step 11, 2026-09-01 |
 | **google `gemini-3.6-flash`** | ~20/day (behaves as daily) | Step 6; the reason chat moved off google entirely |
-| **google `gemini-embedding-001`** | low per-minute cap | Step 2; still live, embeddings remain on google |
+| **google `gemini-embedding-001`** | low per-MINUTE cap | Step 2, and it took down an analysis in Step 11 — see below |
 
-**What 50/day buys:** one onboarding costs 2 calls (extract + compile). `probe_matching_filters.py` costs ~6. `probe_answer_edit.py` costs 4. **A day of development is ~10 probe runs before everything stops.** That is the quota-fit answer for the free tier, and it is a development-velocity problem before it is ever a product problem.
+### Quota-fit spreadsheet (S11-G1, Step 11 AC8) — MEASURED 2026-09-01
 
-**The remedy is named in the 429 itself:** adding 10 credits to OpenRouter raises the free-model allowance to **1000 requests/day**. That is an owner decision (the paid-balance question, already in the blocked table) and it is now backed by a number rather than a guess.
+The gate asks for calls-per-analysis against the providers' caps, as a spreadsheet, with the paid-balance decision made from it. Every latency below is a measured mean from this session's logs, not an estimate.
+
+**Measured per-call cost**
+
+| Task | Provider / model | Mean latency | n |
+|---|---|---|---|
+| `trait_extraction` | openrouter / dots-3-note-preview | 21.3 s | 4 |
+| `persona_digest` | openrouter / dots-3-note-preview | 20.4 s | 4 |
+| `scenario_generation` | openrouter / dots-3-note-preview | 29.5 s | 1 |
+| `date_simulation` (one turn) | openrouter / dots-3-note-preview | **7.5 s** (max 29.7) | 38 |
+| `embeddings` (both vectors, one batch) | google / gemini-embedding-001 | 0.74 s | 2 |
+
+**One analysis, full pool (3 candidates × 2 dates = 6 dates)**
+
+| Stage | Calls | Provider | Wall clock |
+|---|---|---|---|
+| Re-embed requester + 3 candidates | up to **4** | google | ~3 s |
+| Scenario generation, 1 per candidate | **3** | openrouter | ~1.5 min |
+| Date turns — 27 per date × 6 | **162** | openrouter | **~20 min** |
+| Judging, 1 per completed date (Step 12) | **6** | openrouter | ~2 min |
+| **Total** | **171 openrouter + 4 google** | | **~24 min** |
+
+27 turns per date, not 30: the 30-message cap counts environment rows, and a date that fires its full 3 events spends 3 of its 30 slots on them. A date with no events costs 30 turns, so the honest range is **171–189 openrouter calls per analysis**. The plan's pre-build estimate was ~190 — it was a good estimate.
+
+Onboarding one person, for comparison, is **2 calls** (extract + compile). An analysis costs about **as much as 85 onboardings.**
+
+**Against the caps**
+
+| Allowance | Analyses per day | Verdict |
+|---|---|---|
+| OpenRouter free tier, as documented (50/day) | **0.3** | **A single analysis cannot complete.** It needs 3.4× the whole day's allowance |
+| OpenRouter with 10 credits added (1000/day) | **~5** | Workable — and 5 full analyses a day is more than a friends-scale app needs |
+| google embeddings | not the constraint on volume — but see the per-minute cap below | |
+
+**The decision this spreadsheet forces:** on the free tier as documented, the product's core loop **cannot run once**. This is no longer a development-velocity problem (last session's framing) — it is the feature. The remedy is the one named in OpenRouter's own 429 body: **adding 10 credits raises the free-model allowance to 1000/day**, which buys ~5 full analyses a day. That is the owner's call and it is now backed by measurement.
+
+### Correction: the "50 free calls per day" figure is not what it looks like
+
+Last session recorded "OpenRouter free models: 50 requests per DAY, account-wide" as a settled fact. **This session contradicts it, and the contradiction is not explained.**
+
+- At **14:55 UTC** a direct one-token call returned `429 … free-models-per-day`, `X-RateLimit-Limit: 50`, `X-RateLimit-Remaining: 0`, `X-RateLimit-Reset` = 2026-09-02 00:00 UTC.
+- Between **15:12 and 15:30 UTC the same day**, on the same key and the same model, the api container made **118 successful free-model calls** with 5 rate-limited ones among them. No reset happened in between.
+
+So the cap is real and it does bite, but it is **not a simple per-calendar-day counter**, and `X-RateLimit-Reset` did not predict when service resumed. Do not plan against 50/day as a hard ceiling, and do not plan against it being absent either. What is safe to say: **free-tier throughput is unpredictable enough that a 24-minute, 171-call pipeline cannot be relied on to finish.** That is the same conclusion as the table above, reached a second way.
+
+### The other cap, and what it cost today
+
+**google `gemini-embedding-001` is per-MINUTE, and matching walks straight into it.** Matching embeds the requester and then each candidate, sequentially, within a few seconds — four calls into a low per-minute window. It returned `Quota exceeded for … embed_content_requests_per_minute_per_base_model`, and the analysis **failed outright**, taking down a probe run with it.
+
+The retry schedule was the reason it was fatal rather than slow: the resilience layer backed off 2 s then 4 s, so all three attempts landed inside the same blocked minute. **Fixed this session** — rate limits now get their own schedule (20 s, then 30 s, ~50 s of total waiting), separate from the 2 s/4 s that is right for a dropped connection. Named trade, in the code: a call that is doomed anyway now takes ~50 s to say so.
+
+**Still owed and not fixed:** matching makes those embed calls in a tight sequential loop. The backoff now survives the window; spacing the calls would avoid entering it. That is Step 9's module and it is written up as **O-15**.
 
 ### Fidelity transfer gate — the measurement (S8-G1, Step 8 AC7)
 

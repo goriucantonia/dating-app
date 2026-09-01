@@ -149,3 +149,25 @@ The numbered, append-only defect ledger for this project (`development_principle
   Operationally: **one probe run at a time, and clean up the users it leaves behind** — concurrent runs sharing an output file produced a report that was a splice of two different runs.
 - **Status:** closed (prompt no longer names the handle format; `_IDENTIFIER_LIKE` guard added and unit-checked; 13 polluted `probe-match-*` accounts deleted; probe re-run from a clean pool)
 - **Cross-refs:** `server/app/extraction.py`, `server/probes/probe_matching_filters.py`, PICKUP trap 3e.
+
+---
+
+## D-010 — a log line's own field name collided with the logging helper's parameter, and killed the pipeline on its first live run
+
+- **Date:** 2026-09-01
+- **Repo:** `server`
+- **Surfaced in:** Step 11, the very first end-to-end simulation on the real stack.
+- **Mechanism:** `log_event(logger, event, *, level=..., **fields)` takes the event NAME as its second positional parameter. The event-injection log line wanted to record which event had been chosen, and the obvious field name for that is `event`:
+
+  ```python
+  log_event(logger, "event_roll", ..., event=chosen)      # TypeError
+  ```
+
+  Python raises `TypeError: log_event() got multiple values for argument 'event'` — from inside the logging call. The pipeline caught it in its own blind `except`, wrote `analysis_status … failed`, and stopped. **The scenario call had already succeeded and both date rows had been created**, so a full free-tier AI call was spent before the crash, and the analysis presented as "the model failed" when nothing about the model was wrong. The error string was in the log and named the real cause exactly, which is the only reason this cost minutes rather than an afternoon.
+- **Discovery method:** The first live run. Not by any test: every unit test in `test_simulation_rules.py` covers the pure decision functions, and this line lives in the loop that calls them. Not by lint either — `ruff` cannot see the collision, because `**fields` makes the call signature legal until it is executed.
+- **Lesson:** Three.
+  1. **A `**kwargs` logging helper turns its own parameter names into reserved words at every call site in the codebase**, and nothing warns you until that specific line runs. `log_event`'s reserved names are `logger`, `event` and `level`. This is a cost of the helper's shape, and it is worth knowing rather than rediscovering: the field is now `chosen_event`, with a comment saying why.
+  2. **The failure paths need running, not reading.** §7 says the refusal and failure branches are the ones that must log — and the branch that logs is itself code that can be wrong. This line was written, reviewed, and lint-clean; it had never been *executed*.
+  3. **A blind `except` around a pipeline is right, and it makes a programming error look like a provider error.** `analysis_status … reason=pipeline_raised` was honest, but a reader skimming for "did the model work today" would have filed it under quota trouble. The error string carrying the real `TypeError` is what makes the blind catch survivable — truncating it would have been the actual defect.
+- **Status:** closed (field renamed to `chosen_event`; the same run then produced a complete 30-message date with 3 events)
+- **Cross-refs:** `server/app/simulation.py`, `server/app/logging_setup.py`

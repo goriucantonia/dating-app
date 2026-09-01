@@ -2,17 +2,21 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** Step 3 (core schema + startup reconciliation) is **done and witnessed** — all six acceptance criteria observed on the running stack. Step 2 remains built-not-witnessed (API keys still empty). All three repos pushed to their GitHub remotes.
+**Last updated:** 2026-09-01 · **Updated because:** the owner supplied both API keys, and **Step 2 is now done and witnessed** — all six acceptance criteria observed against real providers, owed measurement O-5 closed and deleted. Two forced provisional-model revisions recorded (see below).
 
 ---
 
 ## Read this first (30 seconds)
 
-**Steps 1 and 3 are done and witnessed** (owed items O-4, and O-5 for Step 2). **Step 2 is built, not yet witnessed** — its live-call ACs need `GOOGLE_AI_API_KEY` and `OPENROUTER_API_KEY` in `.env`, both still empty. Its refusal paths, startup validation, unit tests, and grep proofs ARE witnessed.
+**Steps 1, 2, and 3 are done and witnessed** (one owed item left: O-4, the native desktop run). Both API keys are in `.env` (git-ignored). The owner's standing directive (2026-09-01): the priority is API calls that **connect, route correctly, and return simple valid responses** — complex architecture, advanced prompting, and model-tier upgrades are decided later, not now.
 
-**Step 3, witnessed today:** migration `0002` created the six Module 1 tables verbatim (traits before questions — the forward-reference trap); first boot seeded exactly 35 questions and logged every code; second boot logged a no-op; a deleted pool row (PQ17) was restored by name on reboot; all five CHECK constraints rejected their bad inserts; pgvector accepted 768 dims and rejected 3; and `scripts/check_question_seeds.py` proved module plan ↔ seeds fixture ↔ database are character-for-character identical.
+**Step 2, witnessed today with real keys:** `probe_structured_guard.py` GREEN against the live model (3 malformed attempts → repair prompts → typed give-up carrying raw output, no silent default); `probe_ai_smoke.py` GREEN (google generate `'ready'`, native-mode structured dict, 768-dim embedding, openrouter generate through a free model); a config-only model swap observed changing the logged model (AC4); and a real 429 observed being retried with backoff (`ai_call_retry` ×2, honoring retry-after) then surfacing as `RateLimitedError` (AC6).
 
-**Next: Step 4 — Accounts** (registration, login, `/me`). Also: witness Step 2 the moment keys land (see "What is next").
+**Forced revisions, dated inline where the decisions stood (§23):**
+- Embedding pin `text-embedding-004` → **`gemini-embedding-001`** — Google withdrew the old model (API 404). 768 dims requested explicitly (its default is 3072) to match `vector(768)`; vectors L2-normalized by the provider. Zero vectors existed, so the swap cost nothing. Recorded in `ai_interaction.md` §3 and `config/ai.yaml`.
+- Provisional google chat model `gemini-2.5-flash` → **`gemini-3.6-flash`** — the API rejected 2.5 as unavailable to new users. Still provisional; final choice belongs to the gates.
+
+**Next: Step 4 — Accounts** (registration, login, `/me`, Flutter auth flow).
 
 ---
 
@@ -50,7 +54,7 @@ dating_app_ai\                      ← superproject
 | Area | State | Evidence |
 |---|---|---|
 | Step 1 stack | **Witnessed** (2026-09-01): cold up → DB-connected 200; second down/up; topology; envelope; failure path | Prior session, git history |
-| Step 2 `app/ai/` layer | **Built, not yet witnessed** — refusal paths, startup validation, 8 unit tests, AC5 greps ARE witnessed; live-call ACs blocked on keys (O-5) | Container logs, pytest, grep |
+| Step 2 `app/ai/` layer | **Witnessed** (2026-09-01, with real keys): both providers generate; native structured returns a valid dict; embedding 768-dim; guard probe GREEN; config-only model swap observed; 429 → backoff → typed error observed | Probe verdicts + `ai_call`/`ai_call_retry` log lines this session |
 | Step 3 schema | **Witnessed** — migration `0002`: users, traits, questions, answers, trait_events, profile_embeddings (two-vector form), all CHECKs proven by rejected inserts, vector(768) dimension enforced | This session's psql output |
 | Step 3 reconciliation | **Witnessed** — boot 1: 35 seeded (codes logged); boot 2: no-op; deleted PQ17 restored by name on boot 3; management script `scripts/run_reconcile.py` runs the same pass | api logs |
 | Seed fidelity | **Witnessed** — `scripts/check_question_seeds.py` GREEN: plan ↔ `seeds/questions.yaml` ↔ DB identical, 35 questions | script verdict |
@@ -69,18 +73,17 @@ dating_app_ai\                      ← superproject
 
 ## What is next
 
-1. **Step 4 — Accounts** (S4-B1…B5, S4-U1…U7): registration with the exact A1 form, login → JWT, `GET`/`PATCH /me`, the Flutter auth screens + the single 401 interceptor + router guards. `DELETE /me` is deliberately Step 15.
-2. **Witness Step 2** the moment keys land in `.env` (restart api first — compose reads `.env` at container start):
-   - `docker compose exec api python probes/probe_structured_guard.py` → GREEN (3 malformed, 1 gave_up, no silent default).
-   - `docker compose exec api python probes/probe_ai_smoke.py <free-openrouter-model>` → both providers answer, embedding 768-dim. The model argument is probe-only — do not fill the routing slots for it.
-   - AC4: flip `trait_extraction`'s model in `config/ai.yaml`, restart, watch the log line change, flip back.
-   - AC6: a real 429 retried with backoff → typed error; if free-tier quotas don't produce one naturally, it stays in O-5.
+**Step 4 — Accounts** (S4-B1…B5, S4-U1…U7): registration with the exact A1 form, login → JWT, `GET`/`PATCH /me`, the Flutter auth screens + the single 401 interceptor + router guards. `DELETE /me` is deliberately Step 15.
+
+Useful facts for later steps, learned witnessing Step 2:
+- `gemini-3.6-flash` is a **thinking model** — a tight `max_tokens` gets eaten by reasoning and yields `MAX_TOKENS` with no text. Give generous budgets.
+- Free OpenRouter models 429 by congestion, per model. `nvidia/nemotron-3.5-lightning:free` worked; `z-ai/glm-5.2:free` was saturated (and its content includes visible reasoning text). The `free-model-of-choice` slots remain unfilled — these are probe arguments, not choices.
+- The google embedding free tier has a low per-minute cap — batch embed calls, don't loop them.
 
 ## Blocked, and on whom
 
 | Item | Blocked on | Notes |
 |---|---|---|
-| Step 2 witnesses (AC1–AC4, AC6, S2-P1 green) | **Owner:** the two API keys into `.env` | Everything else about Step 2 is done |
 | Native desktop witness (O-4) | **Owner:** enable Windows Developer Mode, then `flutter run -d windows` in `ux\` | Unchanged from last session |
 | OpenRouter `free-model-of-choice` slots | **Owner decision, deferred by design** | Probe takes a model as an argument precisely so the slots stay unfilled |
 | Paid-balance question | **Owner**, from the quota-fit numbers | Unchanged |
@@ -111,19 +114,20 @@ dating_app_ai\                      ← superproject
 | O-2 | Pinned-snapshot assertion in `probe_answer_edit.py` | Step 6 | Step 9 (S9-P2) | **Anticipated** |
 | O-3 | Matching vs properly seeded demo profiles | Step 9 | Step 15 | **Anticipated** |
 | O-4 | Native (Windows) run rendering `/health` | Step 1, 2026-09-01 | Owner: Developer Mode + `flutter run -d windows` | **Owed** |
-| O-5 | **Every Step 2 live-call AC**: generation via both providers with §5 log lines (AC1); 768-dim embedding (AC2); `probe_structured_guard.py` green (AC3); model-swap-by-config observed in the log line (AC4); a real 429 retried then typed (AC6) | Step 2, 2026-09-01 | Keys in `.env` → run the two probes + the AC4 config flip | **Owed** |
+
+*(O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
 ## Probe status (§2)
 
 | Probe | Status |
 |---|---|
-| `probe_structured_guard.py` | **Written, never run green** (needs GOOGLE_AI_API_KEY) |
-| `probe_ai_smoke.py` (helper, not in the §2 minimum set) | Written, never run green |
+| `probe_structured_guard.py` | **GREEN** (2026-09-01, google/gemini-3.6-flash) |
+| `probe_ai_smoke.py` (helper, not in the §2 minimum set) | **GREEN** (2026-09-01; openrouter model passed as argument) |
 | All others (`pool_expansion`, `answer_edit`, `onboarding`, `matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 5–15 |
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 AI Interaction **(built; O-5 — witnesses blocked on keys)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 Accounts ← **next** · 5 Questions & answers · 6 Trait extraction · 7 Persona & snapshots · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 Accounts ← **next** · 5 Questions & answers · 6 Trait extraction · 7 Persona & snapshots · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 

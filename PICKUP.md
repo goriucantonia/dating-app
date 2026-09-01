@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 6 (trait extraction) is built and largely witnessed** — real answers become trait rows with provenance, a no-change re-run is all-`keep` with a byte-identical `traits_hash`, a CONFIRMED trait survives an unrelated edit, and a dispute produces exactly one linked question. D-007 (profile drift on re-reads) was found by the drift alarm and closed. AC5 and the live half of AC6 are **owed** (O-5, O-6), blocked on what looks like a DAILY google free-tier cap — a quota-fit finding, not a bug. **Next: Step 7, persona snapshots.**
+**Last updated:** 2026-09-01 · **Updated because:** **Step 6 (trait extraction) is DONE with all seven acceptance criteria witnessed**, and — owner decision — **`gemini-3.6-flash` is now used for nothing**: every chat/structured task runs on `openrouter/dots-studio/dots-3-note-preview:free`, chosen by measuring four candidates against the real schema. Embeddings stay on google. D-007 (profile drift on re-reads) found by the drift alarm and closed. One honest caveat carried forward: extraction QUALITY on the free model is a visible step down — read the fidelity note. **Next: Step 7, persona snapshots.**
 
 ---
 
@@ -12,7 +12,18 @@ The one document that tells someone with no memory of the last session where thi
 
 **Step 5, witnessed today:** `probe_pool_expansion.py` GREEN over real HTTP (two probe users: one for the under-minimum rejection / mid-batch abandon-and-resume / baseline-excluded-from-pool-progress / edit-bumps-updated_at; one straight run proving exactly 6 batches of 5 in `pool_order` with batch 7 the EXACT `pool_exhausted` payload). In the browser: the onboarding guard forced `/onboarding/questions` on a fresh signed-in user; the interstitial shows the locked copy; BQ1 answered with the live counter flipping at the minimum; **the AC1 kill-and-reopen landed on "3 of 5" with BQ1–BQ2 preserved**; finishing baseline lifted the guard to home; `/profile/expand` showed pool progress, served PQ01 through the SAME widget, rendered the exhausted achievement card verbatim, and opened the prefilled single-answer editor.
 
-**Standing model facts** (Step 2, unchanged): embeddings pinned to `gemini-embedding-001` at 768 dims (dated revision — Google withdrew `text-embedding-004`); provisional google chat model `gemini-3.6-flash`; OpenRouter slots deliberately unfilled.
+**Standing model facts — REVISED 2026-09-01 (owner decision):** **`gemini-3.6-flash` is used for NOTHING.** Every chat/structured task (`trait_extraction`, `persona_digest`, `judging`, `dispute_followups`) routes to **`openrouter/dots-studio/dots-3-note-preview:free`**, provisionally — the final tier choice still belongs to the gates. **Embeddings are untouched and remain `google/gemini-embedding-001` at 768 dims**: a different model on a different quota, pinned separately because every stored vector must come from one model, and OpenRouter serves no embedding equivalent. Four `free-model-of-choice` slots remain deliberately unfilled.
+
+**How that model was chosen — do not re-guess it, re-measure it.** Of the 18 free OpenRouter models only **four** advertise `structured_outputs`, and Step 2's smoke-test model `nvidia/nemotron-3.5-lightning` is **not one of them** — pointed at `trait_extraction.v1` it took **211 seconds and returned non-JSON**. All four candidates were run against the real schema and real prompt:
+
+| Model | Result |
+|---|---|
+| `dots-studio/dots-3-note-preview:free` | **PASS**, 28s, short well-shaped labels — **chosen** |
+| `nvidia/nemotron-3-super-120b-a12b:free` | PASS, 19s, but labels are full sentences and it splits one answer into three traits |
+| `z-ai/glm-5.2:free` | FAIL — 429 saturated (as in Step 2) |
+| `liquid/lfm-2.5-2.6b:free` | 2.6B, too small to trust with this |
+
+**The lesson worth keeping: a Step 2 smoke test proves a model answers; it does not prove the model can satisfy THIS schema. Re-measure per task, not per provider.**
 
 **Since then (2026-09-01), two changes on top of Step 5:**
 
@@ -64,7 +75,7 @@ dating_app_ai\                      ← superproject
 | Step 3 reconciliation | **Witnessed** — boot 1: 35 seeded (codes logged); boot 2: no-op; deleted PQ17 restored by name on boot 3; management script `scripts/run_reconcile.py` runs the same pass | api logs |
 | Step 4 accounts | **Witnessed** — register/login/JWT/`/me`/PATCH with every A1 rule server-side (curl) and the whole flow through the Flutter UI in the browser; session restore across app restarts; dead sessions land on `/login` | This session's curl output + browser screenshots |
 | Seed fidelity | **Witnessed** — `scripts/check_question_seeds.py` GREEN: plan ↔ `seeds/questions.yaml` ↔ DB identical, 35 questions | script verdict |
-| Step 6 extraction | **Witnessed** — traits with provenance across 5 categories; all-`keep` second run with byte-identical hash; confirmed trait survives an unrelated edit; dispute makes exactly one linked question; 30 thin answers declined. AC5/AC6 owed (O-5, O-6) | probe + curl + psql this session |
+| Step 6 extraction | **Witnessed, all 7 ACs** — provenance; all-`keep` second run with byte-identical hash; confirmed trait survives an edit; dispute makes exactly one linked question; 4 traits retracted and still present when an answer's subject was replaced; live one-`done`-one-`queued`; thin answers declined | probe + curl + psql this session |
 | Unit tests | **15 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up) | pytest output |
 | Lint / build | **one pre-existing ruff error**: `RUF100` unused `# noqa: E402` in `migrations/env.py` — untouched by recent work, not yet fixed; image rebuilt green after D-004 editable-install fix | in-container runs |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
@@ -115,11 +126,13 @@ dating_app_ai\                      ← superproject
 | 2 no-change re-run is all-`keep`, no events, hash untouched | **Witnessed** — `kept=6 … added=0`, `changed=false`, hash byte-identical, `trait_events` 6→6 |
 | 3 confirmed trait survives an unrelated edit | **Witnessed** — probe GREEN, status and provenance intact |
 | 4 dispute → exactly one linked `origin='dispute'` question | **Witnessed** — one row, `trait_id` linked, `user_id` set, trait `disputed`, event written |
-| 5 a retracted trait is PRESENT with `status='retracted'` | **OWED (O-5)** — needs a run that actually retracts; blocked on quota below |
-| 6 two rapid requests → one run + one queued follow-up | **Partly witnessed (O-6)** — give-up proven by 4 deterministic unit tests, and live logs show `extraction_queued`/`newly_queued: true` with never a second `extraction_start`. The both-halves-green live run is owed |
+| 5 a retracted trait is PRESENT with `status='retracted'` | **Witnessed** — BQ1's whole subject replaced (bees → chess); 4 traits retracted, all 4 still present as rows, none deleted |
+| 6 two rapid requests → one run + one queued follow-up | **Witnessed** — live: `[(200,'done'), (200,'queued')]`, exactly one `extraction_queued` and one `extraction_follow_up_start`. Also covered by 4 deterministic unit tests |
 | 7 thin answer → logged decline, not an invented trait | **Witnessed** — `bob`'s 30 filler pool answers all declined, zero traits invented from them |
 
-**The blocker on AC5/AC6 is a real quota finding, not a bug:** `gemini-3.6-flash` free tier returns `limit: 20` on `generate_content_free_tier_requests` and stayed exhausted across a 75-second wait and several minutes after — it behaves as a **daily** cap, not the per-minute cap assumed in Step 2. Step 6 spends one call per extraction and the probe alone spends four. **This is material to the quota-fit gate (Step 11 → 12) and should be carried into it.**
+**All seven acceptance criteria are witnessed.** O-5 and O-6 were incurred and closed within the same session and are deleted per the queue rule.
+
+**Honest note on extraction QUALITY, for the fidelity gate (Step 8):** the mechanics are green but the new model is a visible step down from what google produced on the same answers. Gemini gave **6 traits across 5 categories** with short labels (`restores old cars`). `dots-3-note-preview` gave **17 traits across only 2 categories** with snake_case labels (`accepts_being_seen_as_predictable`) — it over-splits and under-categorises. Nothing downstream is broken by this, but a persona built from 17 lopsided traits will read worse than one built from 6 balanced ones. **This is exactly what the fidelity-transfer gate exists to catch — carry it into Step 8 rather than treating the green probe as the whole story.**
 
 ## What is next
 
@@ -158,7 +171,8 @@ Useful facts for later steps, learned witnessing Step 2:
 10. **Calibration chat and match chat share a widget but differ** in flagging/metadata rules (§13).
 11. **Load-bearing orderings** (§19): checkpoint before advancing; counts before cascade; validate before repair; `traits_hash` only after the trait write commits.
 12. **An all-`keep` extraction run leaves everything fresh** (A5.1); **the 30-message cap counts environment rows** (§18).
-12a. **The google free tier looks like a DAILY cap, not a per-minute one** (found in Step 6). `gemini-3.6-flash` returns `limit: 20` on `generate_content_free_tier_requests` and stays exhausted for far longer than a minute — a 75-second wait did not clear it. Every extraction is one call and `probe_answer_edit.py` spends four, so a day's debugging can burn the budget before lunch. Carry this into the quota-fit gate (Step 11 → 12).
+12a. **The google free tier behaves as a DAILY cap** (found in Step 6): `gemini-3.6-flash` returns `limit: 20` and did not clear across a 75-second wait. It blocked two witnesses outright and is the direct reason chat moved to OpenRouter. Still live knowledge because **embeddings remain on google** — Step 9 will re-embed users and will meet this cap. Carry it into the quota-fit gate.
+12b. **Free OpenRouter models are slow and wildly variable** — `dots-3-note-preview` runs ~20-40s per extraction but the whole class queues under congestion, and `z-ai/glm-5.2:free` is reliably 429. Budget minutes, not seconds, for anything that chains several calls. **`--web-port`-style quick loops do not apply here: a probe with four extractions takes several minutes.**
 13. **Ruff's `EXE002` is suppressed on purpose** — through the Windows bind mount every file looks executable; do not "fix" it by chmod.
 14. **Decided things stay decided** (§23).
 
@@ -170,10 +184,8 @@ Useful facts for later steps, learned witnessing Step 2:
 | O-2 | Pinned-snapshot assertion in `probe_answer_edit.py` | Step 6 | Step 9 (S9-P2) | **Anticipated** |
 | O-3 | Matching vs properly seeded demo profiles | Step 9 | Step 15 | **Anticipated** |
 | O-4 | Native (Windows) run rendering `/health` | Step 1, 2026-09-01 | Owner: Developer Mode + `flutter run -d windows` | **Owed** |
-| O-5 | A retraction observed end to end — Step 6 AC5: a trait retracted by a real run, PRESENT in the table with `status='retracted'` rather than absent. The code path and its `trait_event` are written; no run has yet chosen to retract | Step 6, **2026-09-01** | A run that retracts, once google free-tier quota allows | **Owed** |
-| O-6 | Step 6 AC6 live, both halves green — one `done` + one `queued` from two genuinely concurrent requests. The give-up itself is proven by unit tests and visible in the logs; the live run's `done` half died on google quota, not on the lock | Step 6, **2026-09-01** | A live re-run once quota allows | **Owed** |
 
-*(O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
+*(Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
 ## Probe status (§2)
 
@@ -187,7 +199,7 @@ Useful facts for later steps, learned witnessing Step 2:
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done; O-5, O-6)** · 7 Persona & snapshots ← **next** · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 Persona & snapshots ← **next** · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 

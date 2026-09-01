@@ -189,3 +189,18 @@ The numbered, append-only defect ledger for this project (`development_principle
   3. **The check is cheap, so make it a trap entry rather than a memory.** PICKUP trap 3g: if an in-container script cannot import `app.*`, rebuild, then confirm site-packages holds `__editable__.dating_app_server-*.pth` and NOT a real `app/` directory.
 - **Status:** closed (`docker compose build api && docker compose up -d api`; site-packages now holds only the editable finder, `app.models` resolves to `/app/app/models.py`, and `probe_judge.py` runs GREEN)
 - **Cross-refs:** D-004, `Dockerfile`, PICKUP trap 3g
+
+---
+
+## D-013 — the one poller stops on the terminal status the row still reports for a moment after `POST /simulate`
+
+- **Date:** 2026-09-01
+- **Repo:** `ux` (a race against a `server` contract; counts once)
+- **Surfaced in:** Step 13, writing the widget test for the `failed` → "Pick up where it stopped" retry against a MOCKED repository.
+- **Mechanism:** `POST /analyses/{id}/simulate` returns `202` and flips the row to `simulating` inside a background task. The poller stops ticking on any terminal status (`matched`, `complete`, `no_candidates`, `failed`) — correct in general, and the reason a finished analysis costs nothing to revisit. But the button's flow was *POST, then `refreshNow()`*: if that one GET lands before the background task has committed, it reads the OLD terminal status, the poller cancels its timer, and nothing ever polls again. The screen sits on a spinner over a request the server accepted and is happily running. The same race exists on the `matched` → simulate path from Step 11, and the reason it was witnessed working there is only that the task commits faster than a browser round-trip.
+- **Discovery method:** A test, not a run. The mocked repository kept answering `failed` after the retry (as a slow server would for a moment), `pumpAndSettle` timed out on the spinner, and the question "why is the poller not polling" had a one-line answer. Never observed live — and it would have shown up as "the retry button does nothing", filed against the server.
+- **Lesson:** Two.
+  1. **"Stop on terminal" needs an exception for "I just asked for a change."** A client that has requested a transition knows the current status is about to be wrong. `AnalysisPoller.kick()` polls through a terminal status for a 30-second window after a `/simulate`, then stops as usual; both simulate paths use it. The window is bounded so a request the server silently dropped cannot poll forever.
+  2. **A mock that answers "nothing changed" is a better test of a start-then-poll UI than one that answers "done".** The happy-path fake (next GET already says `simulating`) is exactly the timing that hides this class of bug, and it is the timing every live witness so far had.
+- **Status:** closed (`kick()` in `core/polling/poller.dart`; both simulate call sites use it; the retry test asserts the poller keeps polling through a still-`failed` row and that the button is handed back rather than left spinning)
+- **Cross-refs:** `ux/lib/core/polling/poller.dart`, `ux/lib/features/analyses/analysis_screen.dart`, `ux/test/step13_results_test.dart`, PICKUP "Things worth not re-deciding" for Step 13.

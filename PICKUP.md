@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **the judging threshold now counts agent TURNS, not transcript rows** (owner decision) — it was the last rule still counting environment events as if someone had spoken, and the disagreement was not theoretical: a stored date with **11 rows but only 9 turns** had been judged and scored. It is now excluded and that candidate's score recomputed 93.25 → 94.25, at a cost of zero model calls. `MAX_DATES_PER_ANALYSIS` is now DERIVED from the dates-per-candidate knob, closing a trap where raising the knob would have silently left the third candidate with no dates. Steps 11 and 12 are built, both gates CLOSED. Step 9's O-8 is still owed; O-13 and O-14 are deliberately deferred.
+**Last updated:** 2026-09-01 · **Updated because:** **Step 13 (the results UX) is BUILT and tested against mocked data** — the simulating phase with its live date checklist, the transcript viewer with the persisted metadata toggle and `?seq=` anchor, the results dashboard with the score composition and satisfaction curves, and the `failed` state whose retry genuinely RESUMES (server change: `/simulate` now accepts a `failed` analysis that has candidates; witnessed over HTTP with zero model calls). 19 widget tests on fixtures shaped like real stored data; every real stored score recomputed over the wire. **The signed-in browser pass is OWED (O-16)** — this session could not sign in to the release build. D-013 found by a test and closed. Steps 11 and 12 unchanged, both gates CLOSED. O-8 still owed; O-13 and O-14 deliberately deferred.
 
 ---
 
@@ -32,7 +32,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: Step 12 (the judge), which closes the quota-fit gate.** Steps 1–8 and 10 are done and witnessed; **Step 9 is code-complete with its witness OWED (O-8)**; **Step 11 is built with its central claim (resume from checkpoint) witnessed live**, and four of its eight acceptance criteria still owed (O-10…O-13). The fidelity gate is closed with its measurement recorded below; the quota-fit gate is OPEN with its spreadsheet now filled in from measurement.
+**Next: Step 14 (chat: selection and the live conversation).** Steps 1–8, 10 and 12 are done and witnessed; **Step 9 is code-complete with its witness OWED (O-8)**; Step 11 is built with its central claim witnessed; **Step 13 is built, unit- and widget-tested on mocked data, and wire-verified on real data — its signed-in browser pass is OWED (O-16)**. Both gates are closed.
 
 ---
 
@@ -61,7 +61,7 @@ dating_app_ai\                      ← superproject
 │   ├── tests\       test_structured_guard.py · test_traits_hash.py (11 tests, green)
 │   └── the seven server module plans
 └── ux\                             ← submodule
-    ├── Flutter 3.47.2 app (lib\app, lib\core\api, lib\features\debug) + widget test
+    ├── Flutter 3.47.2 app (lib\app, lib\core\{api,auth,polling,notify}, lib\features\{auth,questions,persona,traits,chat,analyses,dates,home,settings,common}) + widget tests
     └── the seven UX module plans
 ```
 
@@ -82,7 +82,8 @@ dating_app_ai\                      ← superproject
 | Step 10 UX dashboard | **Witnessed** — hero, history, reveal with partial banner, Demo chip on 3 surfaces, ONE polling loop proven by the network log, deep links landing cold | browser (release build) this session |
 | Step 11 simulation | **Built; the central claim WITNESSED.** A real analysis ran two full-length dates end to end; a SIGKILLed API came back, reconciliation relaunched it, and the date logged `resumed_from_checkpoint … seq 3` and carried on. 4 of 8 ACs owed — see the table below | api logs + psql + transcript this session |
 | Step 12 judging | **Witnessed, all 7 ACs** — score recomputed by hand on four analyses, both sides of the 10-message boundary, empty `clashes` accepted, provenance on every row, `probe_judge.py` GREEN 9/9, and the quota gate closed on a full run | probe + psql + api logs this session |
-| Unit tests | **78 pass**
+| Step 13 UX results | **Built; tested on MOCKED data (19 widget tests); wire verified on real data; server-side resume WITNESSED over HTTP.** The signed-in browser pass is owed (O-16) — see the Step 13 section | `flutter test` 19/19, `flutter analyze` clean, curl against the running stack, api logs |
+| Unit tests | **Server 91 pass** (8 new in `tests/test_simulate_retry.py`) · **UX 19 pass** (18 new in `test/step13_results_test.dart`, all on mocked repositories — no server, no model calls) | in-container `pytest`; `flutter test` |
 | Lint / build | **GREEN, no outstanding errors.** The long-standing `RUF100` in `migrations/env.py` was removed 2026-09-01 — the suppression named `E402`, which this project does not enable, so the suppression was itself the only lint error in the repo. The reason it documented is kept as a plain comment | in-container `ruff check .` |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
 
@@ -322,13 +323,48 @@ Fixing the server half first is exactly why the symptom survived into a second a
 | 6 every evaluation carries its judge model and `judge_rubric.v1` | **Witnessed** on every row and asserted by the probe |
 | 7 **one full analysis end-to-end; the quota gate closed with real numbers** | **Witnessed** — see below |
 
+## What was just finished (Step 13 — the results UX, built and tested on mocked data)
+
+**UX (S13-U1…U15):** `features/dates/` — `models.dart` (DateSummary, Evaluation, Clash, Transcript, the rubric weights and the score formula as pure functions), `dates_repository.dart` (the two lazy reads and their providers), `metadata_toggle.dart` (the app-wide switch, persisted per user in `shared_preferences`), `date_checklist.dart` (THE checklist, shared by the progress phase and the results), `transcript_screen.dart` (`/dates/:id?seq=`), `results_screen.dart` (`/analyses/:id/results`), `curves.dart` (the pure `buildCurves` and the `fl_chart` widget). `analysis_screen.dart` gains the `simulating` phase, the `failed` state, and the door to the results on `complete`. `core/notify/` — the app-wide completion banner and the web-only local notification. `core/polling/poller.dart` announces a LIVE finish and gains `kick()` (D-013). Routes `/analyses/:id/results` and `/dates/:id` added.
+
+**Server (S13-B1 and two small contract additions):** `ended_by` on every date in `GET /analyses/{id}/dates` and on `GET /dates/{id}/transcript`, computed by the same `ended_by()` the loop uses; `analysis_id` on the transcript; **`POST /simulate` accepts a `failed` analysis that has candidates and resumes it** (pure `simulate_refusal()` gate, unit-tested), logged `simulation_requested … resumed_after_failure: true, failed_stage, previous_error`; a resumed analysis clears its stale `error` on the way back to `simulating`. S13-B1 (transcript readable while the analysis is still `simulating`) needed no work: the endpoint has no status gate, and Step 11's resume probe already read a 3-message transcript mid-run.
+
+**Design import — NOT done, and why.** The owner asked for the Claude Design file `Ranking & Date Reveal.dc.html` (project `8da35c97-…`). Every route to it failed from this session: `DesignSync` needs `/design-login` from an interactive session; the URL is behind claude.ai sign-in (WebFetch 403, in-app browser lands on the login wall); the Chrome extension was not connected. **The screens were built on the existing Material 3 theme.** Restyling to the design is a follow-up once `/design-login` has been run — the structure (which widgets, which data) will not change, only the look.
+
+### Things worth not re-deciding
+
+- **`ended_by` and `excluded_from_score` come from the server and are never re-derived in the client.** A client with its own idea of "mutual" or of the 10-turn rule is a client that can disagree with the score it is showing. The server computes both with the same functions the pipeline used.
+- **The rubric weights live in the client too (`rubricWeights`), keyed by `rubric_version`, and the composition view RECOMPUTES the score in front of the user** and prints "mismatch" if the arithmetic disagrees with the stored value. Verified on real data: all 5 stored evaluations and 4 candidate means recompute exactly over the wire. A v2 rubric is a second table entry, never an edit.
+- **"No score" is not 0.0.** A candidate whose every date was excluded renders "No score — nothing to score" and sorts last. Zero would say "they were terrible together" about an evening that never happened.
+- **The transcript viewer builds every row** (a plain scroll view). `?seq=` needs message N to exist before it can scroll to it, and a transcript is at most 19 rows — laziness buys nothing here and costs the anchor.
+- **The metadata toggle is in `shared_preferences`, keyed per user id, not in the token store** — sign-out wipes the token store, and a preference is not a session. Storage failure falls back to the in-memory default; never an exception into UI code.
+- **The date list refetches when the ONE poller says `progress.updated_at` moved, and never otherwise.** That is how the checklist is live during `simulating` without a second loop (§16), and why results are fetched exactly once on `complete`: the poller has stopped, the key stops changing.
+- **The completion banner fires only on a LIVE transition** (`simulating → complete|failed` seen by the poller), never on a cold load of a finished analysis — the user opened it; they know. The OS notification is browser-only this phase, permission asked on the "Start Simulated Dates" tap because browsers require a gesture (named trade in `simulate_date_page.md`).
+- **A `failed` analysis with no candidates offers "Start a new analysis", not a retry.** It died in matching; the server refuses `/simulate` for it with a sentence saying so. One WITH candidates offers "Pick up where it stopped", and the copy is true: `ensure_dates` reuses rows, finished dates are no-ops, the judge returns stored evaluations.
+- **The poller is `kick()`ed after every `/simulate`** so it polls through the terminal status the row may still report for a moment (D-013). Without it, "the retry button does nothing" was a real, reachable failure that every live witness so far had been fast enough to miss.
+- **The satisfaction chart's axis is fixed at 0–100 even though real data mostly sits at 0** (the Step 11 model finding). Rescaling would make a flat evening dramatic; the caption under the chart says what the numbers are, and rows without state are gaps, not zeros.
+
+### Step 13 acceptance criteria — honest status
+
+| AC | Status |
+|---|---|
+| 1 leave and return: progress reflects real server state | **Built, widget-tested on mocked progress; not witnessed live** — needs a real simulation run (~20 calls) with a signed-in browser. Owed under O-16 |
+| 2 date 1 readable while later dates run | **Built and widget-tested** (checklist row opens the transcript under an "Other dates are still running" banner). Server half witnessed in Step 11. Live UI pass owed (O-16) |
+| 3 metadata toggle both ways, survives a restart | **Widget-tested both ways** (badges appear/disappear; stored OFF honoured on a cold start; the preference is written under the user's key). Browser restart pass owed (O-16) |
+| 4 an incomplete date labeled in viewer AND analytics, with reason | **Widget-tested in both** ("Stopped after message 11 — the AI stopped answering. Scored from a partial date — weighted half."; the viewer footer says "This date stopped early") |
+| 5 tapped score shows criteria + weights; arithmetic matches `date_score` | **Widget-tested, and recomputed on REAL data over the wire:** 5/5 evaluations and 4/4 candidate means match exactly |
+| 6 scrub to message 14 and tap through lands on message 14 | **Widget-tested** via the chart's tap-through into `/dates/:id?seq=N`, with the anchored bubble outlined. The touch gesture on the chart itself is not driven in a test — browser pass owed (O-16) |
+| 7 an event marker corresponds to an actual `environment` row | **Unit-tested** (`buildCurves` produces exactly one marker per environment row, at its seq) |
+| 8 a `failed` analysis names the stage; retry visibly RESUMES | **Server half WITNESSED over HTTP:** a finished analysis marked `failed` (constructed, stated plainly) was retried — 202, `resumed_after_failure: true`, back to `complete` in 2 s, **0 `ai_call` lines**. UI half widget-tested (names "during the dates", calls `/simulate`, keeps polling). A genuine mid-date failure resumed through the UI is owed (O-16) |
+
+
 ## What is next
 
-**Step 13 — the UX for results — is next**: the simulation-progress screen, the transcript viewer, and the results dashboard. Everything it needs is already on the wire and already populated with real data: `GET /analyses/{id}` carries `progress` and each candidate's `final_score`, `GET /analyses/{id}/dates` carries every evaluation plus `excluded_from_score`, and `GET /dates/{id}/transcript` carries the per-turn state. **Twelve real transcripts are in the database to build against, with nine of them judged and five candidate scores computed** — including a partial date, an excluded one, and one that ended by mutual agreement.
+**Step 14 — chat: selection and the live conversation — is next.** Its footer control lives on the results screen, where a placeholder sentence marks the spot. `DateDigest` exists and takes no router; `agent_response.v1` is frozen; the shared chat widget takes `ChatConfig(allowFlagging: false, showMetadata: false)`. Two `free-model-of-choice` slots remain unfilled and Step 14 needs `chat_reply` (already pinned) and `chat_compaction`.
 
-**Read the two model findings in the Step 11 section before designing the per-turn curves** — `connection` and `satisfaction` are used unevenly enough that a chart designed against the schema's 0-100 promise will look broken on real data.
+**Before the Step 13 browser pass (O-16):** run `flutter build web` in `ux/`, `python serve_build.py 5000`, sign in as `probe-sim-alice-4aa682e1@probe.dev` / `probe-password` (owns five complete analyses, one with a partial and an excluded date: `2b83aeab`), and walk the eight ACs above. It is the same trap-3d recipe as Steps 8–11.
 
-**Three witnesses remain owed.** O-13 and O-14 are Step 11's, and the owner has deliberately deferred both (2026-09-01) — do not spend model calls clearing them out of tidiness. **O-8 (Step 9's clean `probe_matching_filters.py` run) is the one that is genuinely open**, and its probe was hardened this session for exactly that. O-9 (Step 10's `no_candidates` screen) is also still open and is nearly free: every probe account is opted out, so an analysis for a lone requester lands there by itself.
+**Owed witnesses.** O-13 and O-14 are Step 11's and the owner has deliberately deferred both — do not spend model calls clearing them. **O-8 (Step 9's clean `probe_matching_filters.py` run) is genuinely open.** O-9 (Step 10's `no_candidates` screen) is nearly free. **O-16 (Step 13 in a signed-in browser) is the new one** and needs no model calls for seven of its eight checks.
 
 **Settled 2026-09-01 (owner decision):** the `trait_extraction` pin on `dots-3-note-preview` is intended, and the apparent conflict with D-008 is not one. **Model pins are testing config and they move with what is available and affordable** — D-008 records why nemotron was right on the day it was written, not a promise that the pin is frozen. What survives from D-008 is the mechanism: one OpenRouter id is several upstream providers, so a task that starts 400ing gets ITS line moved, not every line.
 
@@ -365,6 +401,7 @@ Two things do NOT follow the dates-per-candidate knob and need a human:
 | OpenRouter `free-model-of-choice` slots | **Owner decision, deferred by design** — EXCEPT `dispute_followups`, filled 2026-09-01 with `nvidia/nemotron-3.5-lightning:free` so Step 6 AC4 could be witnessed. Four slots remain unfilled | Probe takes a model as an argument precisely so the slots stay unfilled |
 | Paid-balance question | **Owner**, and the numbers are now in | **Decisive, and much improved by the two 2026-09-01 revisions.** A full analysis is now **~54 calls floor, ~63 observed** (was ~177 at two 30-message dates). On the free tier as documented (50/day) the core loop still cannot run ONCE. 10 credits raises the allowance to 1000/day ≈ **16 analyses a day**, up from 5. See the spreadsheet below |
 | Hosting / CORS / auth posture | **Owner, explicitly deferred** | Unchanged (decision log #11) |
+| Claude Design import (O-18) | **Owner:** run `/design-login` from an interactive Claude Code session on this machine; headless sessions reuse it | `DesignSync` refused without it; the design URL is behind sign-in; the Chrome extension was not connected |
 
 ## Traps that will bite you resuming cold
 
@@ -399,6 +436,9 @@ Two things do NOT follow the dates-per-candidate knob and need a human:
 17. **`probe_simulation_resume.py` runs on the HOST, not in the container**, and it is the only probe that does. It has to kill the api container, and `docker compose exec` processes die *with* the container — a probe that kills the API from inside kills itself mid-assertion. It uses stdlib `urllib` for the same reason (no project virtualenv on the host). Its default run stops once resume is proven; `--full` waits for every date and costs a full analysis.
 18. **A rate-limited call now takes ~50 seconds to fail, on purpose.** Rate limits get their own backoff schedule (20 s, 30 s) separate from the 2 s/4 s used for dropped connections, because every quota this project meets is per-minute or per-day and three retries inside seven seconds all land in the same blocked window. A slow failure is the intended behaviour, not a hang.
 19. **The `dates` rows are created BEFORE any turn runs, and re-running a pipeline reuses them.** That is what makes resume free — but it also means a failed run leaves date rows behind, and re-triggering `POST /simulate` will NOT regenerate the scenarios. To start genuinely fresh, delete the analysis's `dates` rows first.
+20. **`flutter pub add <package>` prints "Building with plugins requires symlink support / enable Developer Mode" on this machine and looks like a failure. It is not** — the pubspec and lockfile are updated, and a plain `flutter pub get` immediately after succeeds; web builds and tests are unaffected. The symlink step is for the Windows desktop target (O-4).
+21. **The UI cannot be signed into by an automated session** (the password field is off-limits to the assistant's browser tools). API-level witnesses go through `curl` with the probe accounts; anything that must be seen signed-in in a browser is the owner's, or a session with a human at the keyboard. This is why O-16 exists.
+22. **A `failed` analysis is resumable only if it has candidates.** `simulate_refusal()` in `app/routers/simulation.py` is the gate; the UI mirrors it (`candidates.isEmpty` → "Start a new analysis"). Reconciliation still relaunches only `matching`/`simulating` on boot — a `failed` one waits for the user's retry, on purpose.
 
 ## Owed measurements (§4)
 
@@ -414,6 +454,9 @@ Two things do NOT follow the dates-per-candidate knob and need a human:
 | O-13 | Step 11 AC6: the empty-intersection fallback observed live, producing two settings whose `anchored_in_interest` values come one from each person's list. Unit-tested both branches; never run against a real pair sharing zero interests | Step 11, **2026-09-01** | Match two people with no overlapping interest labels | **Owed — deliberately deferred** (owner, 2026-09-01): both branches are unit-tested, so this waits until it blocks something or until a wider rollout wants it validated. Do not spend model calls on it before then |
 | O-14 | Step 11 AC7: the global semaphore of 2 observed limiting three queued analyses. `simulation_slot_acquired … waited_ms` logs on every run and read 0 both times, which proves nothing | Step 11, **2026-09-01** | Three users with matched analyses, simulated at once | **Owed — deliberately deferred** (owner, 2026-09-01), on the same reasoning as O-13 |
 | O-15 | Matching embeds the requester and every candidate in a tight sequential loop, which walks straight into google's per-MINUTE embedding cap. The retry schedule now survives the window (fixed this session); the loop still enters it | Step 11, **2026-09-01** | Space or batch the embed calls in `app/matching.py` | **Owed** |
+| O-16 | Step 13 in a signed-in browser against the release build: the eight ACs above, seven of them on the stored data with no model calls. This session built and tested everything on mocked repositories and verified the wire with curl, but could not sign in to the running web app | Step 13, **2026-09-01** | Owner or next session: trap 3d recipe, account named in "What is next" | **Owed** |
+| O-17 | OS-level completion notification on desktop/mobile (S13-U4). Web uses the browser Notification API; other platforms get the in-app banner only, because an OS notification needs a plugin and platform setup | Step 13, **2026-09-01** | Add `flutter_local_notifications` (or similar) once a non-web target is actually run — see O-4 | **Owed — deliberately deferred** until a non-web target exists |
+| O-18 | The Claude Design restyle of the results screens (`Ranking & Date Reveal.dc.html`). Every route to the design file was closed to this session — `/design-login` must be run from an interactive session first | Step 13, **2026-09-01** | Owner: `/design-login`, then import and restyle | **Owed** |
 
 *(O-10, O-11 and O-12 were incurred and closed within the same session and is deleted per the queue rule: O-10 closed on the third run of `probe_simulation_resume.py`, GREEN at 23/23; O-11 closed when a sixth date ended itself by mutual `wants_to_end` at 25 messages with a clean two-line goodbye; O-12's narrowed halves — a transient fault exhausting the 3-attempt ladder, and the pipeline starting the next date after an incomplete one — were both observed unforced when the model emitted a degenerate whitespace loop mid-date.) (O-1 closed 2026-09-01 — `opt_in` was observed removing and restoring a candidate in someone else's pool. O-2 closed 2026-09-01 — the pinned-snapshot assertion is enabled in `probe_answer_edit.py` (S9-P2). Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
@@ -433,7 +476,7 @@ Two things do NOT follow the dates-per-candidate knob and need a human:
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation **(built; resume WITNESSED; O-13/O-14 deferred)** · 12 ~~Judge~~ **(done, all 7 ACs; quota gate CLOSED)** · 13 UX results ← **next** · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation **(built; resume WITNESSED; O-13/O-14 deferred)** · 12 ~~Judge~~ **(done, all 7 ACs; quota gate CLOSED)** · 13 ~~UX results~~ **(built + tested on mocks; browser pass OWED O-16)** · 14 Chat ← **next** · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 

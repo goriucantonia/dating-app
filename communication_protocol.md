@@ -1,6 +1,6 @@
 # Communication Protocol — Server ↔ UI
 
-Status: locked 2026-09-01. High-level contract between `dating-app-server` (FastAPI) and `dating-app-ux` (Flutter). The per-endpoint details live in the module plans; this document is the shape of the conversation between the two repositories.
+Status: locked 2026-09-01. High-level contract between the `server` submodule (FastAPI) and the `ux` submodule (Flutter). The per-endpoint details live in the module plans; this document is the shape of the conversation between the two repositories.
 
 ---
 
@@ -15,7 +15,7 @@ The client never needs to reach Postgres, the AI providers, or anything else dir
 
 ## 2. Docker and where each piece runs
 
-Docker Compose (in `dating-app-server`) orchestrates the **backend only**: two containers, `api` (FastAPI) and `db` (PostgreSQL + pgvector). The database is reachable only from the api container on the compose-internal network — it is never exposed to the UI.
+Docker Compose (at the **superproject root**, `dating_app_ai/`) orchestrates the **backend only**: two containers, `api` (FastAPI, built from `./server`) and `db` (PostgreSQL + pgvector). The database is reachable only from the api container on the compose-internal network — it is never exposed to the UI. *(Revised 2026-09-01: Compose previously lived inside the backend repository. New information: the repositories were restructured — `server` and `ux` are now git submodules of a `dating-app` superproject, and the root is the only repo that can hold deployment files describing both. Owner decision. What Compose orchestrates is unchanged: still `api` + `db` only, still no containerized UI.)*
 
 The **Flutter app is not containerized** this phase. It runs natively (mobile/desktop) or as a local web build, and talks to the api container at its published port: `http://localhost:8000` in development. The base URL is the UI's single piece of environment configuration. *(Trade: no containerized UI build pipeline; accepted — Flutter dev workflow is faster outside Docker, and the friends-phase "deployment" is the owner's machine.)*
 

@@ -12,6 +12,22 @@ Where a task exists only because a principle demands it, the principle number is
 - **Sequential by default.** Each step assumes every prior step is *witnessed*, not merely written (`§1`). Two pairs can overlap safely and are marked so.
 - **"Done" is the ten-point Definition of Done** at the bottom of `development_principles.md`. The per-step Acceptance Criteria below are the *step-specific* half of it; the standing half applies to every step and is not repeated sixteen times.
 
+### Repository layout — where every ticket's output goes
+
+Three git repositories: the `dating-app` superproject at `dating_app_ai/`, with `server` and `ux` as submodules.
+
+| Ticket type | Destination | Repo |
+|---|---|---|
+| `S<n>-D*` — DevOps/Docker: `docker-compose.yml`, `Dockerfile`, `.env.example`, `.gitignore` | **superproject root** | `dating-app` |
+| `S<n>-B*` — Python: `app/`, `migrations/`, `alembic.ini`, `pyproject.toml`, `seeds/`, `scripts/` | `server/` | `server` |
+| `S<n>-P*` — probes | `server/probes/` | `server` |
+| `S<n>-U*` — Flutter/Dart, the whole app | `ux/` | `ux` |
+| Specs, this plan, `PICKUP.md`, `DEFECTS.md` | **superproject root** | `dating-app` |
+
+Bare relative paths in the tickets below (`probes/`, `app/ai/base.py`, `scripts/scan_dead_data.py`, `seeds/demo_profiles.yaml`) are **relative to `server/`** unless the ticket says otherwise. Infrastructure paths are relative to the superproject root.
+
+A change spanning both submodules is three commits: `server`, `ux`, then the superproject pointer bump. An un-bumped pointer serves yesterday's code with today's specs.
+
 ### Standing obligations (apply to all 16 steps — `development_principles.md`)
 
 | Obligation | Principle |
@@ -27,9 +43,12 @@ Where a task exists only because a principle demands it, the principle number is
 
 ### Current state at the time of writing (verified, not assumed — §13)
 
-- `dating-app-server/`: `pyproject.toml`, `app/config.py`, and the `app/ai/` skeleton exist. `base.py` (protocol, typed errors, `VersionedSchema`), `routing.py`, `structured.py`, `resilience.py`, `client.py` are drafted; `google.py` and `openrouter.py` are `NotImplementedError` stubs; `registry.py` is **absent** though `routing.py` and the layout in `ai_interaction.md` §1 both reference it. No database, no migrations, no FastAPI app object, no Docker files, no `probes/`, no `PICKUP.md`, no `DEFECTS.md`.
-- `dating-app-ux/`: `README.md` and the seven module plans only. **No Flutter project exists yet.**
-- Nothing in either repo has been witnessed running (`§1`). The honest status of the whole system today is *planned, partially scaffolded*.
+**There is no application code.** The slate is clean and every step below assumes it.
+
+- Superproject root: the five specs, this plan, `PICKUP.md`, `DEFECTS.md`. **No Docker files, no `.env.example`, no `.gitignore`.**
+- `server/`: `README.md`, `pyproject.toml` (intended dependencies, never installed or checked), and the seven server module plans. **No `app/`, no database, no migrations, no FastAPI application object, no `probes/`.**
+- `ux/`: `README.md` and the seven UX module plans. **No Flutter project.**
+- Nothing has ever been witnessed running (`§1`). The honest status of the whole system today is *planned, not yet built*.
 
 ### Probe map (`§2` — the minimum probe set, and the step that delivers each)
 
@@ -60,9 +79,10 @@ Where a task exists only because a principle demands it, the principle number is
 
 ### Technical Tasks — DevOps/Docker
 
-- **S1-D1** `docker-compose.yml` in `dating-app-server`: exactly two services, `api` (FastAPI) and `db` (Postgres + pgvector image). `db` is on the compose-internal network only — never a published port to the host app (`communication_protocol.md` §2). `api` publishes `8000`.
-- **S1-D2** `Dockerfile` for `api` (Python 3.11+), with the source bind-mounted in dev so a reload is a save, not a rebuild.
-- **S1-D3** `.env.example` naming every variable the config reads: `GOOGLE_AI_API_KEY`, `OPENROUTER_API_KEY`, `DATABASE_URL`, `JWT_SECRET`. Real `.env` git-ignored.
+- **S1-D1** `docker-compose.yml` **at the superproject root**: exactly two services, `api` (FastAPI, build context `./server`) and `db` (Postgres + pgvector image). `db` is on the compose-internal network only — never a published port to the host app (`communication_protocol.md` §2). `api` publishes `8000`. *(Location revised 2026-09-01 by owner decision — the superproject is the only repo that can describe a deployment spanning both submodules. `communication_protocol.md` §2 carries the dated revision; what Compose orchestrates is unchanged.)*
+- **S1-D2** `Dockerfile` **at the superproject root**, building `api` from `./server` (Python 3.11+), with the server source bind-mounted in dev so a reload is a save, not a rebuild.
+- **S1-D3** `.env.example` **at the superproject root**, naming every variable the config reads: `GOOGLE_AI_API_KEY`, `OPENROUTER_API_KEY`, `DATABASE_URL`, `JWT_SECRET`. Real `.env` git-ignored.
+- **S1-D6** `.gitignore` at the superproject root covering `.env` and build artefacts; note that a submodule's own ignores do not cover the root, and the root's do not reach inside a submodule.
 - **S1-D4** Healthcheck on `db`; `api` waits for it. A cold `docker compose up` must reach a serving API without a human retry.
 - **S1-D5** Confirm the Flutter app is **not** containerized this phase, and record it as the named trade it already is (`communication_protocol.md` §2).
 
@@ -72,12 +92,13 @@ Where a task exists only because a principle demands it, the principle number is
 - **S1-B2** The single error envelope as an exception handler pair: `{"error": {"code": ..., "message": ...}}` for every non-2xx, with `code` a stable machine string and `message` already layman-readable (`communication_protocol.md` §5, `§26`).
 - **S1-B3** Structured logging setup (one line per decision, machine-parseable fields) — the substrate every later `§7` obligation writes into.
 - **S1-B4** `alembic.ini` + `migrations/` initialised and wired to the async engine; `CREATE EXTENSION IF NOT EXISTS vector` as the first migration. No tables yet.
-- **S1-B5** Extend `app/config.py` to load the `ai:` block of `ai_interaction.md` §3 verbatim (providers, pinned `embeddings`, `routing`) from a YAML file, with the `free-model-of-choice` slots **deliberately unfilled** and a startup log line saying which routes are unresolved.
-- **S1-B6** Create `probes/` with a README stating the contract: a probe drives a mechanism end-to-end against the real deployment and prints a verdict a human can read (`§2`).
+- **S1-B5** `app/config.py` — settings loading, including the `ai:` block of `ai_interaction.md` §3 verbatim (providers, pinned `embeddings`, `routing`) from a YAML file, with the `free-model-of-choice` slots **deliberately unfilled** and a startup log line saying which routes are unresolved.
+- **S1-B9** Verify `pyproject.toml`'s dependency set actually installs together in the `api` image — it lists the intended packages but has never been resolved. Pin what needs pinning; a failed resolve on day one is cheaper than on day forty.
+- **S1-B6** Create `server/probes/` with a README stating the contract: a probe drives a mechanism end-to-end against the real deployment and prints a verdict a human can read (`§2`).
 
 ### Technical Tasks — UX/Frontend
 
-- **S1-U1** `flutter create` the app in `dating-app-ux`, targeting mobile + desktop + web from one codebase (`technical_details.md`).
+- **S1-U1** `flutter create` the app in `ux/`, targeting mobile + desktop + web from one codebase (`technical_details.md`).
 - **S1-U2** Dependencies per `ux_architecture.md` §1: `flutter_riverpod`, `go_router`, `dio`, `freezed`/`json_serializable`, `flutter_secure_storage`, `fl_chart`.
 - **S1-U3** Material 3 theming: light + dark from one seed colour, system-following (`ux_architecture.md` §1.6).
 - **S1-U4** The layout shell: phone-first; above 840px width, content constrained to a centered ~720px column (`ux_architecture.md` §1.7).
@@ -108,18 +129,21 @@ Where a task exists only because a principle demands it, the principle number is
 
 # Step 2 — AI Interaction Module: the foundational service
 
-**Goal.** Every future AI call in this system has exactly one road to travel: `task name → router → provider → Structured Output Guard → validated dict or a typed error`. Finish the scaffold that exists so no feature module ever parses JSON or imports a concrete provider (`§16`).
+**Goal.** Every future AI call in this system has exactly one road to travel: `task name → router → provider → Structured Output Guard → validated dict or a typed error`. Build the whole layer, so no feature module ever parses JSON or imports a concrete provider (`§16`).
+
+Built from nothing against the locked interface in `server/ai_interaction.md` §1–§5. **Write every file named in that document's §1 layout, even the ones you are not implementing yet** — a file with a `NotImplementedError` and a TODO announces its own incompleteness; a file that is simply absent does not (`DEFECTS.md` D-001).
 
 ### Technical Tasks — Server/Backend
 
-- **S2-B1** Implement `app/ai/google.py` against the `google-genai` SDK: `generate`, `generate_native_structured` (via `response_schema`), `embed`. Map SDK rate-limit errors to `RateLimitedError` and safety blocks to `RefusedError` — SDK exceptions must never escape the module (the stub's own TODO says exactly this).
-- **S2-B2** Implement `app/ai/openrouter.py` against the OpenAI-compatible REST surface with `httpx`: native `response_format: json_schema` where the model supports it, `NotImplementedError` where it does not so the Guard falls back to prompt-embedded schema (`ai_interaction.md` §4.1).
-- **S2-B3** **Write the missing `app/ai/registry.py`** — builds provider instances from config, `name -> instance`. `routing.py` already imports this contract and the layout in `ai_interaction.md` §1 names it; it does not exist yet.
-- **S2-B4** Finish `structured.py` as the single choke point, in the locked order (`§19`: **validate before any repair prompt**): native mode first → validate against the versioned JSON schema (`jsonschema`) → on failure one repair prompt carrying the validation error → **max 3 attempts total** → raise `StructuredOutputError` with the raw output. Never a silent default (`§10`).
-- **S2-B5** Finish `resilience.py`: exponential backoff on 429/5xx, per-provider rate limiters, retries capped at 3 (`§17`), typed exceptions out.
-- **S2-B6** The mandatory per-call log line (`ai_interaction.md` §5): `task, provider, model, attempt, latency_ms, outcome` where outcome ∈ `ok | malformed | rate_limited | refused | gave_up`.
-- **S2-B7** Startup validation: `TaskRouter` already fails fast on unconfigured providers; extend it to log every task whose model slot is still a placeholder, so an unfilled route is loud rather than a mid-date surprise.
-- **S2-B8** Schema registry `app/schemas/` holding `VersionedSchema` instances; `agent_response.v1` is added here in Step 7.
+- **S2-B1** `app/ai/base.py` — the `AIProvider` protocol from `ai_interaction.md` §2, the `GenRequest`/`GenResult`/`VersionedSchema` value types, the `TaskName` literal covering all eight routed tasks, the `CallOutcome` literal (`ok | malformed | rate_limited | refused | gave_up`), and the typed error hierarchy: `AIError` (carrying task/provider/model), `TransientAIError`, `RateLimitedError`, `RefusedError`, `StructuredOutputError` (carrying the raw output). Typed errors are the contract with the resilience layer — SDK exceptions must never escape the module.
+- **S2-B2** `app/ai/google.py` against the `google-genai` SDK: `generate`, native structured output via `response_schema`, and `embed`. Map SDK rate-limit errors to `RateLimitedError` and safety blocks to `RefusedError`.
+- **S2-B3** `app/ai/openrouter.py` against the OpenAI-compatible REST surface with `httpx`: native `response_format: json_schema` where the model supports it, falling back so the Guard embeds the schema in the prompt where it does not (`ai_interaction.md` §4.1).
+- **S2-B4** `app/ai/registry.py` — builds provider instances from config, `name -> instance`. Nothing else may instantiate a provider.
+- **S2-B5** `app/ai/routing.py` — `TaskRouter`, resolving `task -> (provider, model)` from config. Fails at startup, not mid-date: every routed provider must exist, and every task whose model slot is still a placeholder is logged loudly so an unfilled route is never a surprise.
+- **S2-B6** `app/ai/structured.py` — the single choke point, in the locked order (`§19`: **validate before any repair prompt**): native mode first → validate against the versioned JSON schema (`jsonschema`) → on failure one repair prompt carrying the validation error → **max 3 attempts total** → raise `StructuredOutputError` with the raw output. Never a silent default (`§10`).
+- **S2-B7** `app/ai/resilience.py` — exponential backoff on 429/5xx, per-provider rate limiters, retries capped at 3 (`§17`), typed exceptions out.
+- **S2-B8** The mandatory per-call log line (`ai_interaction.md` §5): `task, provider, model, attempt, latency_ms, outcome`.
+- **S2-B9** `app/schemas/` — the schema registry holding `VersionedSchema` instances; `agent_response.v1` is added here in Step 7.
 
 ### Technical Tasks — Probe
 

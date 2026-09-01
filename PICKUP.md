@@ -2,70 +2,56 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** the project was restructured into a superproject (`dating_app_ai`) with `server` and `ux` as git submodules. Nothing has been *built* since the last update; the layout changed and this document follows it.
+**Last updated:** 2026-09-01 · **Updated because:** the repository restructure finished and the earlier partial code scaffold was removed for a clean start. There is now no application code in either submodule.
 
 ---
 
 ## Read this first (30 seconds)
 
-This project is **fully planned and barely built**. Twenty-one specification documents are locked. The code that exists is a partial scaffold of one module, and **not one line of it has ever been observed running** (`§1`). If you are about to report on this project, the correct words are "planned, partially scaffolded" — not "in progress", not "underway", and certainly not "working".
+This project is **fully planned and not yet built**. Twenty-one specification documents are locked, the 16-step build order is written, and **no application code exists**. Nothing has ever been observed running (`§1`).
 
-The build order is [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Start at Step 1. Do not start at Step 2 because the AI module looks half-finished — Step 2 needs the Docker stack from Step 1 to be witnessed against.
+If you are about to report on this project, the correct words are "planned, not yet built". Not "in progress", not "underway", and certainly not "working".
 
-**Before you touch anything, read "The submodule migration is unfinished" below.** Some spec documents and the entire code scaffold are not yet inside the submodules that are supposed to hold them.
+Start at Step 1 of [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). The slate is clean and the plan assumes exactly that.
 
 ---
 
 ## Repository layout
 
+Three git repositories: the `dating-app` superproject, with `server` and `ux` as submodules.
+
 ```
-D:\AI EXPERIEMENT\
-├── dating_app_ai\              ← THE PROJECT. Superproject git repo.
-│   ├── .gitmodules             ← server + ux submodule definitions
-│   ├── user_perspective.md         (source of truth)
-│   ├── project_description.md      (architecture + decision log)
-│   ├── technical_details.md        (stack)
-│   ├── development_principles.md   (the how — stable § numbers, never renumber)
-│   ├── communication_protocol.md   (the wire between the two repos)
-│   ├── IMPLEMENTATION_PLAN.md      (16-step build order)
-│   ├── PICKUP.md                   (this file — §24)
-│   ├── DEFECTS.md                  (the shared ledger — §21)
-│   ├── server\                 ← submodule → github.com/goriucantonia/dating-app-server
-│   └── ux\                     ← submodule → github.com/goriucantonia/dating-app-ux
-└── dating_app\                 ← OLD LOCATION. Superseded, not yet emptied.
+dating_app_ai\                      ← superproject
+├── .gitmodules
+├── user_perspective.md                 (source of truth)
+├── project_description.md              (architecture + decision log)
+├── technical_details.md                (stack)
+├── development_principles.md           (the how — stable § numbers, never renumber)
+├── communication_protocol.md           (the wire between the two repos)
+├── IMPLEMENTATION_PLAN.md              (16-step build order)
+├── PICKUP.md                           (this file — §24)
+├── DEFECTS.md                          (the shared ledger — §21)
+├── server\                         ← submodule
+│   ├── README.md, pyproject.toml
+│   └── ai_interaction.md, module_1_data_collection.md, trait_persona.md,
+│       candidate_matching.md, date_simulation.md, chat.md, data_hygiene.md
+└── ux\                             ← submodule
+    ├── README.md
+    └── ux_architecture.md, new_user_creation.md, profile_settings.md,
+        main_dashboard.md, simulate_date_page.md, simulation_results.md,
+        chat_selection.md
 ```
 
-**Where things get written from now on:**
+**Where things get written:**
 
-| Kind of file | Goes in |
-|---|---|
-| Specs, roadmap, principles, `PICKUP.md`, `DEFECTS.md` | `dating_app_ai\` (superproject root) |
-| Server module plans, Python code, `probes/`, `scripts/`, `seeds/`, `docker-compose.yml`, Alembic migrations | `dating_app_ai\server\` |
-| UX module plans, Flutter project and all Dart code | `dating_app_ai\ux\` |
+| Kind of file | Goes in | Repo |
+|---|---|---|
+| Specs, roadmap, principles, `PICKUP.md`, `DEFECTS.md` | superproject root | `dating-app` |
+| **Docker and other infrastructure** — `docker-compose.yml`, `Dockerfile`, `.env.example`, `.gitignore` | superproject root | `dating-app` |
+| Server module plans, Python code, `probes\`, `scripts\`, `seeds\`, Alembic migrations, `pyproject.toml` | `server\` | `server` |
+| UX module plans, the Flutter project and all Dart code | `ux\` | `ux` |
 
-`dating_app\` is the pre-restructure copy. Do not add anything to it. It is still referenced below only because it currently holds the **only** copy of some files.
-
----
-
-## The submodule migration is unfinished
-
-The superproject and both submodule repos exist and are wired through `.gitmodules`. **The file migration into them is partial.** As of this update, these files exist only in the old `dating_app\` folder and are absent from the submodules that should own them:
-
-**Missing from `server\`:**
-
-- `app\` — the entire Python scaffold, 10 files: `app/__init__.py`, `app/config.py`, `app/ai/{__init__,base,client,google,openrouter,resilience,routing,structured}.py`. **This is the only copy of the AI Interaction Module scaffold that exists anywhere.**
-- `pyproject.toml`
-- `module_1_data_collection.md`, `trait_persona.md`, `candidate_matching.md`, `date_simulation.md`, `chat.md`, `data_hygiene.md`
-
-`server\` currently holds only `README.md` and `ai_interaction.md`.
-
-**Missing from `ux\`:**
-
-- `ux_architecture.md`, `main_dashboard.md`, `simulate_date_page.md`, `simulation_results.md`, `chat_selection.md`
-
-`ux\` currently holds only `README.md`, `new_user_creation.md`, and `profile_settings.md`.
-
-This is a known, in-flight state — not a defect (`DEFECTS.md` is for what got past us, not for work visibly in progress). **It must be finished before Step 1 begins**, because Step 1 commits into repositories that do not yet contain their own specifications, and because six locked module plans currently live outside version control's reach of the repos that implement them.
+Compose lives at the **root**, not in `server\` — owner decision, 2026-09-01. The superproject is the only repo that can describe a deployment spanning both submodules. `communication_protocol.md` §2 carries the dated revision; what Compose orchestrates (`api` + `db` only, no containerized UI) is unchanged.
 
 ---
 
@@ -75,44 +61,37 @@ This is a known, in-flight state — not a defect (`DEFECTS.md` is for what got 
 |---|---|---|
 | Specification | **Locked**, 21 documents, decisions dated and named inline | The `.md` files themselves |
 | Build roadmap | **Written**, 16 steps | `IMPLEMENTATION_PLAN.md` |
-| Repo structure | **Superproject + 2 submodules exist**; file migration into them is **partial** | `.gitmodules`, directory listings |
-| Docker stack | **Does not exist** — no `docker-compose.yml`, no `Dockerfile` | Directory listing |
+| Repo structure | **Complete** — superproject + both submodules, each holding its own module plans | Directory listings, `.gitmodules` |
+| Docker stack | **Does not exist** — no `docker-compose.yml`, no `Dockerfile`, no `.env.example` | Directory listing |
 | Database | **Does not exist** — no migrations, no Alembic config, no tables | Directory listing |
-| FastAPI app | **Does not exist** — no application object, no endpoints | Directory listing |
-| AI Interaction Module | **Partially scaffolded**, and currently outside the submodule — see below | Source read 2026-09-01 |
-| Flutter app | **Does not exist** — `ux\` holds module plans and a README, no project | Directory listing |
+| FastAPI app | **Does not exist** — no `app/`, no application object, no endpoints | Directory listing |
+| AI Interaction Module | **Does not exist** — built from scratch in Step 2 | Directory listing |
+| Flutter app | **Does not exist** — `ux\` holds module plans and a README only | Directory listing |
 | Probes | **None written**, none pass | `server\probes\` does not exist |
 | Anything witnessed on a running stack | **Nothing** | There is no running stack |
 
-### What exists in the AI scaffold (currently at `dating_app\dating-app-server\app\`, destined for `server\app\`)
-
-- `config.py` — drafted; loads settings. Has not been exercised against a real config file.
-- `ai/base.py` — the `AIProvider` protocol, `GenRequest`/`GenResult`, `VersionedSchema`, and the typed error hierarchy (`AIError`, `TransientAIError`, `RateLimitedError`, `RefusedError`, `StructuredOutputError`). This file is in good shape and matches `ai_interaction.md` §2.
-- `ai/routing.py` — `TaskRouter`, fails fast on unconfigured providers. Good shape.
-- `ai/structured.py`, `ai/resilience.py`, `ai/client.py` — drafted, unexercised.
-- `ai/google.py`, `ai/openrouter.py` — **explicit `NotImplementedError` stubs with TODOs.** No provider works.
-- `ai/registry.py` — **missing.** See `DEFECTS.md` D-001. `TaskRouter` cannot be constructed without it.
-
-`pyproject.toml` lists the intended dependencies. Whether they install cleanly together has not been checked.
+The only code-adjacent artifact in either submodule is `server\pyproject.toml`, which lists the intended dependencies. Whether they install cleanly together has not been checked.
 
 ---
 
 ## What was just finished
 
-- **Project restructured** into the `dating_app_ai` superproject with `server` and `ux` as git submodules. This resolves the previous trap that the shared documents were tracked by no repository at all — they are now in the superproject, which is where §21 and §24 want them.
+- **Repository restructure complete.** The `dating-app` superproject holds the specs, the roadmap, and the two project documents; `server` and `ux` are submodules and each now carries its own module plans. This also resolved an earlier problem where the shared documents were tracked by no repository at all — §21 and §24 both want them at a project root, and now there is one.
+- **Clean slate for the code.** The earlier partial scaffold was removed. Step 2 builds the AI Interaction Module from nothing, against the locked interface in `server\ai_interaction.md`.
+- **Compose relocated to the superproject root** (owner decision, 2026-09-01), with the revision named inline in `communication_protocol.md` §2 per §23 rather than left to drift silently. `IMPLEMENTATION_PLAN.md` tickets S1-D1…D3 follow, and S1-D6 was added for a root `.gitignore` — a submodule's ignores do not cover the root, and the root's do not reach inside a submodule, so nothing was covering `.env`.
 - `IMPLEMENTATION_PLAN.md` — the 16-step roadmap, derived strictly from the locked specs. Server and UX steps are interleaved so each server module is witnessed through the screen that consumes it.
 - Two judgment calls recorded there and worth repeating: the **fidelity-transfer gate closes in Step 8** (it needs the calibration chat) and the **quota-fit gate opens in Step 11 and closes in Step 12** (it needs real call volume). Both must be shut before the first real analysis — they are not end-of-project tasks.
 - `DELETE /me` was deliberately deferred from Step 4 to Step 15 so its cascade is verified whole rather than grown piecemeal.
-- This document and `DEFECTS.md` created, then moved to the new superproject root.
 
 ---
 
 ## What is next
 
-1. **Finish the submodule migration** (see above). Not a build step — a prerequisite to one.
-2. **Step 1 — Foundations: the stack, the wire, and the honesty artifacts.** Tickets S1-D1…D5, S1-B1…B8, S1-U1…U6 in `IMPLEMENTATION_PLAN.md`.
+**Step 1 — Foundations: the stack, the wire, and the honesty artifacts.** Tickets S1-D1…D6, S1-B1…B8, S1-U1…U6 in `IMPLEMENTATION_PLAN.md`.
 
-Step 1 is done when `docker compose up` from cold serves a DB-connected `GET /health`, a **second** `down`/`up` does the same, and the Flutter app renders that response over real HTTP — natively and as a web build.
+Done when `docker compose up` from cold serves a DB-connected `GET /health`, a **second** `down`/`up` does the same, and the Flutter app renders that response over real HTTP — natively and as a web build.
+
+Nothing blocks starting it right now.
 
 ---
 
@@ -120,11 +99,9 @@ Step 1 is done when `docker compose up` from cold serves a DB-connected `GET /he
 
 | Item | Blocked on | Notes |
 |---|---|---|
-| Step 1's first commit | **The unfinished submodule migration** | Committing into a repo that lacks its own module plans invites the two from drifting immediately |
 | Filling the `free-model-of-choice` routing slots | **Owner decision, deferred by design** | Not a blocker for Steps 1–7. Provisional models are enough to exercise the paths in Step 2. |
 | The paid-balance question | **Owner**, decided from the quota-fit numbers | `ai_interaction.md` §3. Do not pre-empt it. |
 | Hosting / external access, CORS and auth posture | **Owner, explicitly deferred** | Decision log #11: local-only this phase, revisited *with* the hosting decision, not piecemeal before it |
-| Whether `dating_app\` gets deleted once migration completes | **Owner** | It currently holds the only copy of the code scaffold. Do not delete it before that is copied across. |
 
 Nothing else is blocked. Everything else is unbuilt, which is a different thing.
 
@@ -132,9 +109,9 @@ Nothing else is blocked. Everything else is unbuilt, which is a different thing.
 
 ## Traps that will bite you resuming cold
 
-1. **Three git repositories, not one.** The superproject tracks the specs and a *pointer* to each submodule's commit. A change spanning both repos is three commits: server, ux, then the superproject pointer bump. A submodule left un-bumped means someone cloning the superproject gets yesterday's code with today's specs. `§21` still applies across all three — **one** shared `DEFECTS.md`, at the superproject root, and a UX defect caused by a server contract is recorded once and cross-referenced.
+1. **Three git repositories, not one.** The superproject tracks the specs and a *pointer* to each submodule's commit. A change spanning both submodules is three commits: `server`, `ux`, then the superproject pointer bump. A submodule left un-bumped means someone cloning the superproject gets yesterday's code with today's specs. `§21` still applies across all three — **one** shared `DEFECTS.md`, at the superproject root, and a UX defect caused by a server contract is recorded once and cross-referenced.
 
-2. **The old `dating_app\` folder is not a backup, it is the original.** Until the migration finishes it holds the only copy of `app/` and six server module plans. Treat it as load-bearing, not as cruft.
+2. **A submodule's `.gitignore` does not cover the root, and the root's does not reach inside a submodule.** With `.env` living at the root next to Compose, this is how a secret gets committed. S1-D6 exists for exactly this.
 
 3. **The `questions` table has a forward reference.** In `module_1_data_collection.md` A3, `CREATE TABLE questions` declares `trait_id UUID REFERENCES traits(id)`, but `traits` is defined *later* in the document. A migration that runs the blocks in written order will fail. Create `traits` first, or add the foreign key after both tables exist. The document is correct as a specification; it is not an execution order.
 

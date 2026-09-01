@@ -1,15 +1,15 @@
 # Development Principles
 
-Scope: these principles govern how `dating-app-server` and `dating-app-ux` are built. The *what* lives in the spec documents — `user_perspective.md` (source of truth), `project_description.md` (architecture + decision log), `technical_details.md` (stack), and the module plans (`module_1_data_collection.md`, `ai_interaction.md`, `trait_persona.md`, `candidate_matching.md`, `date_simulation.md`, `chat.md`, `data_hygiene.md`, plus the `dating-app-ux/*.md` files). This document is the *how*. Section numbers are stable — the module plans cite them (§7, §9, §12, §16, §17, §23…); never renumber.
+Scope: these principles govern how the `server` and `ux` submodules are built. The *what* lives in the spec documents — `user_perspective.md` (source of truth), `project_description.md` (architecture + decision log), `technical_details.md` (stack), and the module plans (`module_1_data_collection.md`, `ai_interaction.md`, `trait_persona.md`, `candidate_matching.md`, `date_simulation.md`, `chat.md`, `data_hygiene.md`, plus the `ux/*.md` files). This document is the *how*. Section numbers are stable — the module plans cite them (§7, §9, §12, §16, §17, §23…); never renumber.
 
 Project artifacts these principles create and maintain:
 
 | Artifact | Where | Principle |
 |---|---|---|
-| Committed probe scripts | `dating-app-server/probes/` | §2 |
+| Committed probe scripts | `server/probes/` | §2 |
 | Owed-measurements list | `PICKUP.md`, "Owed" section | §4 |
 | Defect ledger | `DEFECTS.md` (project root, shared) | §21 |
-| Dead-data scan | `dating-app-server/scripts/scan_dead_data.py` | §22, `data_hygiene.md` |
+| Dead-data scan | `server/scripts/scan_dead_data.py` | §22, `data_hygiene.md` |
 | Decision log | `project_description.md` + per-module "trades named" | §20, §23 |
 | Pickup document | `PICKUP.md` (project root) | §24 |
 
@@ -21,7 +21,7 @@ Project artifacts these principles create and maintain:
 
    Anything that keeps state has a first run that creates the state and a second run that consumes it — the witness must include the second run. In this system that is not a corner case, it is the product: startup reconciliation (first boot seeds BQ1–BQ5, PQ01–PQ30, demo profiles; second boot must be a no-op and log it), questionnaire save/resume (answer, kill the app, return to the right question), simulation resume (kill the server mid-date, restart, watch it continue from the last checkpointed message — not restart), answer editing (edit, re-extract, confirm the persona goes stale while old snapshots don't), and pool exhaustion (answer question 30, request a batch, get the defined state).
 
-2. Every mechanism gets a committed probe. A probe is a script in `dating-app-server/probes/`, named after the thing it proves, that drives the mechanism end to end against the real deployment and prints a verdict a human can read. Its output is the witness from §1. The minimum probe set, one per locked mechanism:
+2. Every mechanism gets a committed probe. A probe is a script in `server/probes/`, named after the thing it proves, that drives the mechanism end to end against the real deployment and prints a verdict a human can read. Its output is the witness from §1. The minimum probe set, one per locked mechanism:
 
    - `probe_onboarding.py` — register, answer BQ1–BQ5 (with an edit mid-way), extract, compile; verify traits and snapshot exist.
    - `probe_pool_expansion.py` — batches of 5 in `pool_order`; abandon one mid-batch and resume; drive to exhaustion and verify the `pool_exhausted` payload.

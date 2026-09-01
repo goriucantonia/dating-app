@@ -171,3 +171,21 @@ The numbered, append-only defect ledger for this project (`development_principle
   3. **A blind `except` around a pipeline is right, and it makes a programming error look like a provider error.** `analysis_status … reason=pipeline_raised` was honest, but a reader skimming for "did the model work today" would have filed it under quota trouble. The error string carrying the real `TypeError` is what makes the blind catch survivable — truncating it would have been the actual defect.
 - **Status:** closed (field renamed to `chosen_event`; the same run then produced a complete 30-message date with 3 events)
 - **Cross-refs:** `server/app/simulation.py`, `server/app/logging_setup.py`
+
+---
+
+## D-012 — the D-004 fix was in the Dockerfile but not in the image that was running, for an unknown number of sessions
+
+- **Date:** 2026-09-01
+- **Repo:** `server`
+- **Surfaced in:** Step 12, the first run of `probe_judge.py` inside the api container.
+- **Mechanism:** `docker compose exec api python probes/probe_judge.py` died on `ImportError: cannot import name 'Analysis' from 'app.models' (/usr/local/lib/python3.11/site-packages/app/models.py)`. That path is the one D-004 was closed about: a baked, non-editable copy of `app` in site-packages shadowing the bind-mounted live code. The Dockerfile's fix (`pip install .` → `pip uninstall -y dating-app-server` → `pip install --no-deps -e .`) was present and correct. **The running image predated it.** `docker compose restart` and `docker compose up -d` both reuse the existing image; only `docker compose build` replaces it, and nothing in the daily loop runs that.
+
+  It hid for so long because two of the three ways this code gets imported put the live tree first *by accident of working directory*: `uvicorn app.main:app` runs with `WORKDIR /app`, and `pytest` inserts its rootdir. Only a script invoked as `python probes/<file>.py` — whose `sys.path[0]` is `/app/probes`, not `/app` — falls through to site-packages. The last probe to import `app.*` in-container was written in Step 2.
+- **Discovery method:** An `ImportError` naming a symbol added forty minutes earlier. Confirmed by `grep -c SimulatedDate` against both copies: 0 in site-packages, 2 in `/app/app`, and no `__editable__*.pth` anywhere.
+- **Lesson:** Three.
+  1. **A fix in a build file is not a fix in a running system.** D-004 was closed on the Dockerfile edit and a rebuild that happened at the time; every rebuild-less session since has been running the old image. "Closed" should have meant "and the image in use has it", which is checkable in one command.
+  2. **A defence that only holds by accident of working directory is not a defence.** `uvicorn` and `pytest` were both silently masking this, which is why it took a third entry point to expose it. When a fix's success depends on `sys.path` ordering, test the entry point that has the *worst* ordering.
+  3. **The check is cheap, so make it a trap entry rather than a memory.** PICKUP trap 3g: if an in-container script cannot import `app.*`, rebuild, then confirm site-packages holds `__editable__.dating_app_server-*.pth` and NOT a real `app/` directory.
+- **Status:** closed (`docker compose build api && docker compose up -d api`; site-packages now holds only the editable finder, `app.models` resolves to `/app/app/models.py`, and `probe_judge.py` runs GREEN)
+- **Cross-refs:** D-004, `Dockerfile`, PICKUP trap 3g

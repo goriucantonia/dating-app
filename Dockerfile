@@ -19,8 +19,16 @@ WORKDIR /app
 # broken resolve fails loudly at build time — S1-B9). The package COPY itself
 # is uninstalled again: a baked site-packages copy of `app` silently shadows
 # the bind-mounted live code for scripts (DEFECTS.md D-004).
+#
+# `.[dev]` and not `.`: pytest and ruff are how this project checks its own
+# definition of done, and until 2026-09-01 they were in the image only because
+# someone had once installed them by hand. That is invisible, unreproducible,
+# and it vanished the moment the image was rebuilt (see D-012 for the same
+# shape of problem next door). Declared dependencies or they do not exist.
+# Trade: a larger image. Accepted — this image is the dev target, bind-mounted
+# and running --reload; nothing about it is minimal already.
 COPY pyproject.toml ./
-RUN pip install . && pip uninstall -y dating-app-server
+RUN pip install ".[dev]" && pip uninstall -y dating-app-server
 
 # The dev workflow bind-mounts ./server over /app; this COPY makes the image
 # self-sufficient when run without the mount. The editable install makes /app

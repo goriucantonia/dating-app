@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 11 is built and its central claim is witnessed** — two personas held a real 30-message date, events fired and the agents reacted to them, and a SIGKILLed server came back and CONTINUED the same date from `seq 3` rather than restarting it. Two defects were found doing it (D-010, D-011) and one instrumentation gap was closed. **The quota-fit spreadsheet (S11-G1) is below with measured numbers, and its answer is decisive: one full analysis costs ~171 model calls.** Also corrected below: **the "50 free calls a day" figure in the last PICKUP is wrong as stated** — see the quota section. **Step 9's end-to-end witness (O-8) is still OWED.**
+**Last updated:** 2026-09-01 · **Updated because:** **Steps 11 and 12 are both built, and BOTH GATES ARE NOW CLOSED.** Step 12's seven acceptance criteria are all witnessed and the quota-fit gate closed on a real end-to-end run: `POST /analyses` → matching → two 30-message dates → judging → `complete`, in **59 model calls and 7m13s with zero retries**. The judge re-scored the same transcript with a **delta of 0.00**. Step 11 carries two deliberately-deferred witnesses (O-13, O-14) and **Step 9's O-8 is still owed**. Three defects found by running things: D-010, D-011, D-012.
 
 ---
 
@@ -81,7 +81,8 @@ dating_app_ai\                      ← superproject
 | Step 9 matching | **Code complete, witness OWED (O-8)** — do not mark done | see O-8 |
 | Step 10 UX dashboard | **Witnessed** — hero, history, reveal with partial banner, Demo chip on 3 surfaces, ONE polling loop proven by the network log, deep links landing cold | browser (release build) this session |
 | Step 11 simulation | **Built; the central claim WITNESSED.** A real analysis ran two 30-message dates end to end; a SIGKILLed API came back, reconciliation relaunched it, and the date logged `resumed_from_checkpoint … seq 3` and carried on. 4 of 8 ACs owed — see the table below | api logs + psql + transcript this session |
-| Unit tests | **63 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up + 14 matching math + 29 simulation rules + 5 backoff) | pytest output |
+| Step 12 judging | **Witnessed, all 7 ACs** — score recomputed by hand on four analyses, both sides of the 10-message boundary, empty `clashes` accepted, provenance on every row, `probe_judge.py` GREEN 9/9, and the quota gate closed on a full run | probe + psql + api logs this session |
+| Unit tests | **78 pass**
 | Lint / build | **GREEN, no outstanding errors.** The long-standing `RUF100` in `migrations/env.py` was removed 2026-09-01 — the suppression named `E402`, which this project does not enable, so the suppression was itself the only lint error in the repo. The reason it documented is kept as a plain comment | in-container `ruff check .` |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
 
@@ -286,11 +287,43 @@ Fixing the server half first is exactly why the symptom survived into a second a
 
 **One more thing the wire did on its own:** mid-date, `dots-3-note-preview` emitted a degenerate whitespace loop — a JSON object that opened `"connection":` and then produced thousands of newlines until it hit `max_tokens`. The Guard spent its three validation attempts, gave up with the raw output attached, and the date ended `incomplete` at its last good message while the pipeline moved on. This is the give-up ladder working, and it is worth knowing that this model does that.
 
+## What was just finished (Step 12 — the judge, and the quota gate CLOSED)
+
+**Server (S12-B1…B11):** migration `0007` (`date_evaluations`, `candidate_scores` verbatim from §3). `app/schemas/judge_rubric.py` — the schema AND the rubric text, versioned together. `app/judging.py` — the judge call, the code-side scoring, the candidate aggregation, and `DateDigest`. The simulation pipeline now judges **before** it transitions to `complete`. `GET /analyses/{id}` carries each candidate's `final_score`; `GET /analyses/{id}/dates` carries each date's full evaluation and an `excluded_from_score` flag.
+
+**Probe:** `probes/probe_judge.py` — **GREEN, 9/9** (S12-P1). **Unit tests: 78 pass** (15 new in `tests/test_judging_math.py`).
+
+### Things worth not re-deciding
+
+- **The rubric TEXT lives in the schema file, versioned with the schema.** `date_evaluations.rubric_version` claims a stored score was produced under particular instructions; that claim is only worth something if the instructions and the shape they produce cannot drift apart. Changing what a criterion means is a v2.
+- **There is deliberately no `overall_score` field in the schema.** The four criteria are asked for; the number is arithmetic (S12-B5). A model asked for a headline number produces one that does not follow from its own sub-scores, and then nobody can say why a date scored 71.
+- **Both halves are stored — the model's raw `criteria` and the code's `date_score`.** Either alone is unauditable: only the score and the weights are invisible; only the criteria and the score is irreproducible. Storing both is what lets the probe recompute by hand, and what would let a future weights change be applied to old evaluations with no AI call at all.
+- **`clash_severity` is inverted at exactly one point in the codebase**, inside `date_score`. It is the only criterion where high is bad, and doing the `(100 - x)` anywhere else as well would double-count it silently.
+- **`candidate_score` returns `None`, never `0.0`, when nothing is judgeable.** `0.0` is a SCORE and it means "they were terrible together". A candidate whose every date died before it started has no score, and that difference survives to the wire as `final_score: null`.
+- **`excluded_from_score` is computed server-side and shipped.** A client re-deriving the 10-message rule is a client that can disagree with the server about someone's score.
+- **The judge is told when a transcript was cut short.** Without that note it scores the missing ending as a bad ending — the technical failure would be charged to the person.
+- **A judge that cannot run does not throw away six finished dates.** Judging failure lands the analysis `complete` with `stage: judging_failed`, transcripts readable, and says so plainly. `failed` would hide an evening's worth of real work behind an error.
+- **`DateDigest` takes no router, structurally.** It cannot make an AI call because it has nothing to make one with — which is a stronger guarantee than a comment saying it must not.
+
+### Step 12 acceptance criteria — all seven witnessed
+
+| AC | Status |
+|---|---|
+| 1 `probe_judge.py` green on both assertions | **Witnessed — 9/9.** Hand-recomputed score matched the stored value to the penny (90.00 vs 90.00), and **the same transcript re-judged scored identically: delta 0.00** at temperature 0.1 |
+| 2 `candidate_scores` arithmetically checkable by hand | **Witnessed on four analyses.** e.g. (94.25 + 84.00)/2 = **89.12**; (93.00 + 92.75)/2 = **92.88**. Every input is in the `candidate_scored` log line |
+| 3 an incomplete date is judged, flagged `is_partial`, weighted 0.5 | **Witnessed at 11, 19 and 20 messages.** By hand: (94.25×1 + 91.25×0.5) / 1.5 = **93.25**, exactly the stored value. A plain mean would have given 92.75 |
+| 4 an incomplete date under 10 messages is EXCLUDED; both sides of the boundary observed | **Witnessed.** `date_not_judged … messages: 6, threshold: 10` beside a 19-message date judged as partial, in the same analysis, with `dates_excluded: 1` in the candidate's score line and `excluded_from_score: true` on the wire. **How the 6-message date was made, stated plainly:** its 19-message sibling was produced by a forced fault, but no natural run landed under 10 — the timing window is a few seconds wide. So a genuine transcript was **truncated to 6 rows in the database**. The messages are real model output; the length was constructed. The rule under test (`is_judgeable`) ran on the real server path either way |
+| 5 an empty `clashes` array is accepted as a verdict | **Witnessed repeatedly** — most judged dates returned `clashes: 0` with `clash_severity: 0`, stored as-is, never retried into producing one |
+| 6 every evaluation carries its judge model and `judge_rubric.v1` | **Witnessed** on every row and asserted by the probe |
+| 7 **one full analysis end-to-end; the quota gate closed with real numbers** | **Witnessed** — see below |
+
 ## What is next
 
-**Step 12 — the judge — is next**, and it CLOSES the quota-fit gate. Read the spreadsheet below before starting: one full analysis is ~171 model calls and ~24 minutes, and S12-G1 asks for one of those end to end without exhausting a cap.
+**Step 13 — the UX for results — is next**: the simulation-progress screen, the transcript viewer, and the results dashboard. Everything it needs is already on the wire and already populated with real data: `GET /analyses/{id}` carries `progress` and each candidate's `final_score`, `GET /analyses/{id}/dates` carries every evaluation plus `excluded_from_score`, and `GET /dates/{id}/transcript` carries the per-turn state. **Twelve real transcripts are in the database to build against, with nine of them judged and five candidate scores computed** — including a partial date, an excluded one, and one that ended by mutual agreement.
 
-**Six owed witnesses are cheap to clear alongside it**, and five of them are Step 11's own (O-10…O-14) — all of them need the same thing, a candidate pair and a few minutes of quota. O-8 (Step 9's clean probe run) and O-9 (Step 10's `no_candidates` screen) are still open from previous steps.
+**Read the two model findings in the Step 11 section before designing the per-turn curves** — `connection` and `satisfaction` are used unevenly enough that a chart designed against the schema's 0-100 promise will look broken on real data.
+
+**Three witnesses remain owed.** O-13 and O-14 are Step 11's, and the owner has deliberately deferred both (2026-09-01) — do not spend model calls clearing them out of tidiness. **O-8 (Step 9's clean `probe_matching_filters.py` run) is the one that is genuinely open**, and its probe was hardened this session for exactly that. O-9 (Step 10's `no_candidates` screen) is also still open and is nearly free: every probe account is opted out, so an analysis for a lone requester lands there by itself.
 
 **Settled 2026-09-01 (owner decision):** the `trait_extraction` pin on `dots-3-note-preview` is intended, and the apparent conflict with D-008 is not one. **Model pins are testing config and they move with what is available and affordable** — D-008 records why nemotron was right on the day it was written, not a promise that the pin is frozen. What survives from D-008 is the mechanism: one OpenRouter id is several upstream providers, so a task that starts 400ing gets ITS line moved, not every line.
 
@@ -322,6 +355,8 @@ Useful facts for later steps, learned witnessing Step 2:
 3c. **Probes cannot see browser-only failures** (D-006). Every probe runs inside the api container, where there is no Origin header and no preflight. CORS, mixed content, cookies, websocket upgrades: the probe suite is GREEN straight through all of them. Reaching the API *from the browser* is its own witness step.
 3d. **When dwds will not co-operate, witness against a RELEASE BUILD, not the dev server.** `flutter build web` then `python -m http.server 5000 --bind 127.0.0.1` from `ux/build/web`. No debug websocket exists, so the whole dwds failure class disappears; it loads in about a second instead of ninety, and it is what the user would actually run. Cost: no hot reload, and you must rebuild after each Dart change. This is how Step 8 was witnessed after the dev server refused to boot the app repeatedly.
 3e. **Do not edit files under `server/` while a probe is running.** uvicorn runs with `--reload`; a save restarts the API and kills every in-flight request the probe is waiting on. A long matching probe was lost to this. Either wait for the probe to settle, or make the edit and accept re-running it.
+3h. **`pytest` and `ruff` were in the image only because someone once installed them by hand.** `pyproject.toml` declares them under the `dev` extra, and the Dockerfile ran `pip install .` — no extra. Nobody noticed for eleven steps because the tools happened to be present in a long-lived image; the first genuine rebuild (D-012) removed them and both commands in the definition of done stopped working. Fixed 2026-09-01: the Dockerfile now installs `.[dev]`. **The general shape, worth carrying: if a tool is not named in a build file, it is not installed — it is merely present.**
+3g. **The running image can be OLDER than the Dockerfile, and D-004's fix only protects you if the image is current.** Found in Step 12: `docker compose exec api python probes/probe_judge.py` died on `ImportError: cannot import name 'Analysis' from 'app.models'` — because site-packages still held a stale non-editable copy of `app` from an image built before the D-004 fix. It hid for a long time because `uvicorn` and `pytest` both put the live `/app` first by accident of working directory, and only a probe run as `python probes/<file>.py` (whose `sys.path[0]` is `/app/probes`) exposes it. **`docker compose restart` does not rebuild.** If an in-container script cannot import `app.*`, run `docker compose build api && docker compose up -d api`, then check that site-packages holds `__editable__.dating_app_server-*.pth` and NOT a real `app/` directory.
 3f. **Deep links need BOTH halves, and each alone looks like the other is broken.** Client: `usePathUrlStrategy()` in `main.dart` — without it Flutter web's default HASH strategy means go_router sees only the empty part after `#` and starts at `/`, **while the correct URL sits in the address bar**. Server: an SPA fallback to `index.html` — `ux/serve_build.py` does this; `python -m http.server` does not and 404s. If a deep link misbehaves, check both before suspecting the router.
 4. **`.env` holds the DB password the volume was initialized with** — regenerate both together or neither.
 5. **The `questions` table has a forward reference** (`module_1_data_collection.md` A3): create `traits` before `questions`, or add the FK after both exist.
@@ -372,18 +407,19 @@ Useful facts for later steps, learned witnessing Step 2:
 | `probe_onboarding.py` | **GREEN** (2026-09-01, S7-P1 — 16 checks, real AI calls) |
 | `probe_matching_filters.py` | Written (S9-P1); **the one clean run is still OWED (O-8)** |
 | `probe_simulation_resume.py` | **GREEN — 23/23** (2026-09-01, S11-P1, real AI calls, ~13 minutes). It took three runs to get there and the first two failed on the PROBE, not the code: an uncaught Windows socket abort when it killed the API, then a `UnicodeEncodeError` printing its own verdict on a legacy-code-page console. Both fixed. The recorded green run waited for the whole analysis, which is what `--full` now selects; the 23 assertions are unchanged by that gating |
-| All others (`judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 12–15 |
+| `probe_judge.py` | **GREEN — 9/9** (2026-09-01, S12-P1). Takes an account email as its argument and reuses an already-judged date rather than simulating a fresh one: `docker compose exec api python probes/probe_judge.py <email>`. Costs ONE call |
+| All others (`deletion`, `demo_seeding`) | Not written — delivered in Step 15 |
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation **(built; resume WITNESSED; O-10…O-13 owed)** + **quota gate OPEN with its spreadsheet filled** · 12 Judge + **quota gate closes** ← **next** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation **(built; resume WITNESSED; O-13/O-14 deferred)** · 12 ~~Judge~~ **(done, all 7 ACs; quota gate CLOSED)** · 13 UX results ← **next** · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 
 | Gate | Closes in | Status |
 |---|---|---|
 | Fidelity transfer | Step 8 | **CLOSED 2026-09-01** — see the measurement below |
-| Quota fit | Step 11 → 12 | **OPEN, spreadsheet FILLED 2026-09-01 (S11-G1).** The end-to-end run in Step 12 closes it. Its answer is already decisive — see below |
+| Quota fit | Step 11 → 12 | **CLOSED 2026-09-01 (S12-G1)** — one full analysis end to end, 59 calls in 7m13s with zero retries. Measurement below |
 
 ### Quota reality, measured (feeds the quota-fit gate)
 
@@ -447,6 +483,27 @@ So the cap is real and it does bite, but it is **not a simple per-calendar-day c
 The retry schedule was the reason it was fatal rather than slow: the resilience layer backed off 2 s then 4 s, so all three attempts landed inside the same blocked minute. **Fixed this session** — rate limits now get their own schedule (20 s, then 30 s, ~50 s of total waiting), separate from the 2 s/4 s that is right for a dropped connection. Named trade, in the code: a call that is doomed anyway now takes ~50 s to say so.
 
 **Still owed and not fixed:** matching makes those embed calls in a tight sequential loop. The backoff now survives the window; spacing the calls would avoid entering it. That is Step 9's module and it is written up as **O-15**.
+
+### Quota-fit gate — CLOSED 2026-09-01 (S12-G1, Step 12 AC7)
+
+**The run:** analysis `1ea9f4d9`, one uninterrupted pass from `POST /analyses` to `status: complete`. Matching → 1 scenario call → 2 dates of 30 messages → 2 judge calls → scored. Nothing was restarted, nothing was injected, no cap was hit.
+
+| | Calls | Mean latency |
+|---|---|---|
+| `scenario_generation` | 1 | 27.2 s |
+| `date_simulation` (turns) | 56 | 6.0 s |
+| `judging` | 2 | 18.3 s |
+| **Total** | **59** | **retries: 0** |
+
+**Wall clock: 7 minutes 13 seconds**, start to `complete`. Embeddings cost nothing on this run — both people were already fresh; a cold run adds up to 4 google calls.
+
+56 turns for 60 stored messages: the other 4 are environment rows, which take a slot but no call.
+
+**Against the Step 11 spreadsheet.** The estimate for this shape (1 candidate, 2 dates) was 1 + 54 + 2 = **57 calls**; the measurement is **59**, 3.5% high, because only 2 events fired instead of the 3 the estimate assumed. Scaled to a full pool (3 candidates, 6 dates) the measurement gives **~177 calls and ~21 minutes**, refining Step 11's 171. The estimate was good and the gate does not change the conclusion — it sharpens it.
+
+**What the gate asked, and the answer:** *can one full pipeline complete against the real providers without exhausting a daily cap?* **Yes — and it did.** 59 calls, zero retries, zero rate-limited responses, in seven minutes.
+
+**But read the number the other way before relaxing.** 59 calls is a `partial` pool with ONE candidate. A full pool is ~177, and the documented free-model allowance is 50 a day. **This run only succeeded because the free tier is not behaving like the 50/day counter it advertises** (see the correction above) — it is not evidence that the free tier is sufficient, it is evidence that the pipeline is efficient and correct. The paid-balance decision stands exactly where the Step 11 spreadsheet left it, now with a completed run behind it rather than an estimate.
 
 ### Fidelity transfer gate — the measurement (S8-G1, Step 8 AC7)
 

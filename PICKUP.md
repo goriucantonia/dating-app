@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 9 is code-complete but its end-to-end witness is OWED (O-8)** — the OpenRouter free tier is **50 requests/day account-wide** and was exhausted; that number is now measured and feeds the quota-fit gate. D-009 recorded: a prompt fix of mine taught the model to write identifiers into trait `label`, and a conditional probe assertion passed vacuously over it. O-1 and O-2 are closed. **Next: one clean probe run after 2026-09-02 00:00 UTC, then Step 10.**
+**Last updated:** 2026-09-01 · **Updated because:** **Step 10 is built and largely witnessed on real data** — the dashboard, the reveal, one polling loop proven against the network log, and deep links working after finding they need BOTH an SPA fallback AND `usePathUrlStrategy()`. **Step 9 remains code-complete with its end-to-end witness OWED (O-8)** — do not record it as done. OpenRouter free tier is 50 requests/day and was exhausted; it resets 2026-09-02 00:00 UTC.
 
 ---
 
@@ -32,7 +32,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: finish Step 9's owed witness (O-8) after the quota resets, then Step 10.** Steps 1–8 are done and witnessed; Step 9 is code-complete. The fidelity gate is closed with its measurement recorded below.
+**Next: clear O-8 and O-9 after the quota resets, then Step 11 (date simulation).** Steps 1–8 are done and witnessed; **Step 9 is code-complete with its witness OWED**; Step 10 is built and largely witnessed. The fidelity gate is closed with its measurement recorded below.
 
 ---
 
@@ -78,6 +78,8 @@ dating_app_ai\                      ← superproject
 | Step 6 extraction | **Witnessed, all 7 ACs** — provenance; all-`keep` second run with byte-identical hash; confirmed trait survives an edit; dispute makes exactly one linked question; 4 traits retracted and still present when an answer's subject was replaced; live one-`done`-one-`queued`; thin answers declined | probe + curl + psql this session |
 | Step 7 persona | **Witnessed, all 7 ACs** — ready v1 with verbatim excerpts; v1/v2/v3 immutable; §11 gate; forced failure leaves the previous current; no prompt on the wire; flags reach the next compilation | probe + curl + psql this session |
 | Step 8 UX + gate | **Witnessed** — profile cards with guess-vs-confirmed styling, one-tap confirm, calibration chat with flagging, settings; **fidelity gate CLOSED with a recorded measurement** | browser (release build) this session |
+| Step 9 matching | **Code complete, witness OWED (O-8)** — do not mark done | see O-8 |
+| Step 10 UX dashboard | **Witnessed** — hero, history, reveal with partial banner, Demo chip on 3 surfaces, ONE polling loop proven by the network log, deep links landing cold | browser (release build) this session |
 | Unit tests | **15 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up) | pytest output |
 | Lint / build | **one pre-existing ruff error**: `RUF100` unused `# noqa: E402` in `migrations/env.py` — untouched by recent work, not yet fixed; image rebuilt green after D-004 editable-install fix | in-container runs |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
@@ -213,9 +215,36 @@ dating_app_ai\                      ← superproject
 
 **Why nothing above is claimed as done:** the one GREEN run this session was polluted — concurrent probe runs shared an output file and stale probe users stayed in the pool, so the requester matched a PREVIOUS run's candidate and `shared_interests` was vacuous because of D-009. Every re-run since has been blocked by the OpenRouter daily cap. **The code is complete and lint/unit-test clean; the end-to-end witness needs one clean run once quota resets.**
 
+## What was just finished (Step 10 — dashboard and the matches reveal)
+
+**UX (S10-U1…U13):** `core/polling/poller.dart` — THE polling primitive; `features/analyses/` — models, repository, and `/analyses/:id`; `features/common/demo_chip.dart`; the dashboard rewritten with history as its spine. **Server (S10-B1):** candidates carry `is_demo` and trait **labels only**.
+
+**Things worth not re-deciding:**
+- **The Poller is a `family` provider that is NOT autoDispose.** That is the whole mechanism behind "one loop across navigation". Making it autoDispose would silently double server load and look fine.
+- **`DemoChip` renders nothing when `isDemo` is false**, so no call site needs an `if`. An `if` is forgettable; this is not.
+- **Breakdown labels are pills, not `Chip`s.** A `Chip` lays its label on one line and truncates, and a trait label is the ONLY thing shown about a candidate.
+- **`/analyses/:id` is one route phase-switched by status**, which is also what makes deep links work in every phase.
+
+### Step 10 acceptance criteria
+
+| AC | Status |
+|---|---|
+| 1 deep link lands in the right phase | **Witnessed** — cold-loaded `/analyses/<id>` renders the reveal directly. Needed BOTH fixes below |
+| 2 exactly one polling loop across navigation | **Witnessed** — the browser network log shows exactly ONE `GET /analyses/{id}` across dashboard → analysis → dashboard → analysis |
+| 3 `partial` banner + reduced cards; `no_candidates` calm with no simulate button | **`partial` witnessed** on real data; the `no_candidates` screen is built and was not rendered this session — **owed (O-9)** |
+| 4 Demo chip on every surface | **Witnessed** on three: latest-result card, history row, breakdown header |
+| 5 raw JSON has no descriptions or answers | **Witnessed on the wire** — 0 matches for `description` / `answer_text` / `system_prompt` |
+| 6 four states on every screen | Loading, content and error paths are all written; not every empty state was rendered this session — see O-9 |
+
+**DEEP LINKS: the fix is TWO halves, and each alone makes the other look broken.**
+1. **Server:** an SPA fallback to `index.html` (`ux/serve_build.py`), or `/analyses/<id>` is a 404 for a path that is not a file.
+2. **Client:** `usePathUrlStrategy()` in `main.dart`, or Flutter web's default **hash** strategy means go_router only sees the empty part after `#` and starts at `/` — **with the correct URL still in the address bar**, which is what makes it so confusing.
+
+Fixing the server half first is exactly why the symptom survived into a second attempt looking unchanged. This closes the open question PICKUP has carried since Step 5.
+
 ## What is next
 
-**Finish Step 9's witness first** (O-8): after 2026-09-02 00:00 UTC, from a clean pool, `docker compose exec api python probes/probe_matching_filters.py` — ONE run, no file edits while it runs. Then **Step 10 — UX dashboard and the matches reveal**.
+**Two owed witnesses first, both cheap once quota resets (2026-09-02 00:00 UTC):** O-8 (Step 9's clean probe run) and O-9 (Step 10's `no_candidates` screen). Then **Step 11 — date simulation**, which opens the quota gate and is the most quota-hungry step in the plan; read the measured quota numbers below before starting it.
 
 Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality), `carol@dating-test.dev` (no answers), plus disposable probe users.
 
@@ -243,6 +272,7 @@ Useful facts for later steps, learned witnessing Step 2:
 3c. **Probes cannot see browser-only failures** (D-006). Every probe runs inside the api container, where there is no Origin header and no preflight. CORS, mixed content, cookies, websocket upgrades: the probe suite is GREEN straight through all of them. Reaching the API *from the browser* is its own witness step.
 3d. **When dwds will not co-operate, witness against a RELEASE BUILD, not the dev server.** `flutter build web` then `python -m http.server 5000 --bind 127.0.0.1` from `ux/build/web`. No debug websocket exists, so the whole dwds failure class disappears; it loads in about a second instead of ninety, and it is what the user would actually run. Cost: no hot reload, and you must rebuild after each Dart change. This is how Step 8 was witnessed after the dev server refused to boot the app repeatedly.
 3e. **Do not edit files under `server/` while a probe is running.** uvicorn runs with `--reload`; a save restarts the API and kills every in-flight request the probe is waiting on. A long matching probe was lost to this. Either wait for the probe to settle, or make the edit and accept re-running it.
+3f. **Deep links need BOTH halves, and each alone looks like the other is broken.** Client: `usePathUrlStrategy()` in `main.dart` — without it Flutter web's default HASH strategy means go_router sees only the empty part after `#` and starts at `/`, **while the correct URL sits in the address bar**. Server: an SPA fallback to `index.html` — `ux/serve_build.py` does this; `python -m http.server` does not and 404s. If a deep link misbehaves, check both before suspecting the router.
 4. **`.env` holds the DB password the volume was initialized with** — regenerate both together or neither.
 5. **The `questions` table has a forward reference** (`module_1_data_collection.md` A3): create `traits` before `questions`, or add the FK after both exist.
 6. **`profile_embeddings`: build the two-vector form** (`kind IN ('identity','preference')`, PK `(user_id, kind)`) — the revised copy, restated in `candidate_matching.md` §3.
@@ -269,6 +299,7 @@ Useful facts for later steps, learned witnessing Step 2:
 | O-6 | Step 8 AC4's stale→fresh flip: the header was witnessed in its `failed` state but not observed going "Profile changed" → rebuild → "up to date" | Step 8, **2026-09-01** | A browser pass after an answer edit | **Owed** |
 | O-7 | The fidelity gate re-run **by the owner on the owner's own account**. The gate asks you to count lines *you* would never say; this session could only assess against the account's written answers | Step 8, **2026-09-01** | Owner | **Owed** |
 | O-8 | Step 9's end-to-end witness: ONE clean `probe_matching_filters.py` run from an empty probe pool. The only GREEN run this session was polluted (concurrent runs sharing an output file; stale probe users in the pool; `shared_interests` vacuous under D-009) | Step 9, **2026-09-01** | A single clean run after the OpenRouter daily cap resets (2026-09-02 00:00 UTC) | **Owed** |
+| O-9 | Step 10's `no_candidates` screen and the remaining empty states rendered in a browser. The code paths exist and `partial` was witnessed; the empty pool was not reproduced this session | Step 10, **2026-09-01** | Toggle the only candidate's `opt_in` off and re-run | **Owed** |
 
 *(O-1 closed 2026-09-01 — `opt_in` was observed removing and restoring a candidate in someone else's pool. O-2 closed 2026-09-01 — the pinned-snapshot assertion is enabled in `probe_answer_edit.py` (S9-P2). Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
@@ -285,7 +316,7 @@ Useful facts for later steps, learned witnessing Step 2:
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness owed O-8)** ← **finish first** · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation + **quota gate opens** ← **next** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 

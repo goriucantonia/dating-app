@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 7 (persona compilation, snapshots, `agent_response.v1`) is built and witnessed** — `probe_onboarding.py` GREEN over 16 checks, immutable per-user versioned snapshots, the system prompt never leaving the server, calibration chat working, and flags feeding the next compilation as negative examples. D-008 found and closed: one OpenRouter model id is several upstream providers and one of them broke `trait_extraction` outright. **Next: Step 8, UX profile + the fidelity gate.**
+**Last updated:** 2026-09-01 · **Updated because:** **Step 8 is built and the FIDELITY TRANSFER GATE IS CLOSED** — measured, not impressionistic: 6 persona replies through the real date-simulation model, 1 clear "I'd never say that" (an invented cooking anecdote) plus 1 borderline. The profile screen, the shared chat widget, calibration and settings all render and work in the browser. Owner decision: extraction quality is a known concern deferred to a later model upgrade — do NOT keep re-raising it. **Next: Step 9, candidate matching.**
 
 ---
 
@@ -32,7 +32,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: Step 8 — UX profile screen and the FIDELITY TRANSFER GATE.** Steps 1–7 are all done and witnessed.
+**Next: Step 9 — candidate matching.** Steps 1–8 are all done and witnessed; the fidelity gate is closed with its measurement recorded below.
 
 ---
 
@@ -77,6 +77,7 @@ dating_app_ai\                      ← superproject
 | Seed fidelity | **Witnessed** — `scripts/check_question_seeds.py` GREEN: plan ↔ `seeds/questions.yaml` ↔ DB identical, 35 questions | script verdict |
 | Step 6 extraction | **Witnessed, all 7 ACs** — provenance; all-`keep` second run with byte-identical hash; confirmed trait survives an edit; dispute makes exactly one linked question; 4 traits retracted and still present when an answer's subject was replaced; live one-`done`-one-`queued`; thin answers declined | probe + curl + psql this session |
 | Step 7 persona | **Witnessed, all 7 ACs** — ready v1 with verbatim excerpts; v1/v2/v3 immutable; §11 gate; forced failure leaves the previous current; no prompt on the wire; flags reach the next compilation | probe + curl + psql this session |
+| Step 8 UX + gate | **Witnessed** — profile cards with guess-vs-confirmed styling, one-tap confirm, calibration chat with flagging, settings; **fidelity gate CLOSED with a recorded measurement** | browser (release build) this session |
 | Unit tests | **15 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up) | pytest output |
 | Lint / build | **one pre-existing ruff error**: `RUF100` unused `# noqa: E402` in `migrations/env.py` — untouched by recent work, not yet fixed; image rebuilt green after D-004 editable-install fix | in-container runs |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
@@ -158,9 +159,35 @@ dating_app_ai\                      ← superproject
 | 6 `GET /persona/current` never contains the prompt | **Witnessed** — checked against the raw response body, 0 matches |
 | 7 a flag is stored against the right snapshot and appears in the next compilation | **Witnessed** — v1/v2 have no negatives; v3, compiled after the flag, carries both the "THINGS YOU WOULD NEVER SAY" section and the user's correction verbatim |
 
+## What was just finished (Step 8, all tickets + the gate)
+
+**UX (S8-U1…U9):** `features/traits/` — `/profile` with cards grouped by the six categories, `/profile/calibration`; `features/chat/chat_widget.dart` — THE shared chat widget built once; `features/settings/` — `/settings`.
+
+**S8-B1 needed no work:** `GET /traits` has carried `confidence` and `status` since Step 6, so nothing is derived client-side.
+
+**Things worth not re-deciding:**
+- **A guess looks like a guess** (§9). `inferred` renders with a hand-painted DOTTED border and says "AI's read, not confirmed"; `confirmed` is solid; `disputed` is amber. Confidence is a 3-step strength dot and **never a percentage** — "0.62 confident you're stubborn" is absurd theater, and a number invites arguing with the decimal instead of the claim.
+- **The shared chat widget's differences live in `ChatConfig`, passed in by the screen.** Calibration sets `allowFlagging: true`; match chat (Step 14) will set it false — flagging someone else's double is meaningless. Because the difference is a parameter rather than a branch inside the widget, neither chat can inherit the other's behaviour by someone editing the shared file (§13, §16).
+- **Disputing deep-links to the generated question.** A dispute that only recolours a card leaves the user with no way to correct anything, which is the opposite of what they just asked for.
+- **Delete account is deliberately absent from `/settings`** — it ships in Step 15 with its server counterpart.
+
+### Step 8 acceptance criteria
+
+| AC | Status |
+|---|---|
+| 1 inferred vs confirmed distinguishable at a glance | **Witnessed** in the browser — dotted + "AI's read, not confirmed" against solid + "You confirmed this" |
+| 2 confirm/dispute in one tap; error rolls back | **Confirm witnessed** in the browser (dotted → solid in one tap). The rollback path is written but was not forced — see owed O-5 |
+| 3 dispute deep-links to its follow-up question | **Partly** — the server pairing was witnessed in Step 6 (exactly one linked question); the UI deep-link is built and not yet clicked through — O-5 |
+| 4 staleness header flips both ways | **Partly** — the `failed` state was witnessed live (the AC5 forced failure rendered "The last rebuild didn't finish. Your previous version is still in use."); the stale→fresh flip is not yet observed — O-6 |
+| 5 calibration uses the real snapshot and pipeline, no "calibration mode" prompt | **Witnessed** — replies come from the snapshot's own system prompt through the ordinary Guard path; there is no second prompt anywhere in the code |
+| 6 flag visible on the bubble, counted in the footer, present in the next compilation | **Witnessed** — long-press → dialog → bubble outlined in the error colour, footer 1 → 2; the "present in the next compilation" half was witnessed in Step 7 (v3 carried it verbatim) |
+| 7 fidelity gate recorded with model, message count, and flag count | **Witnessed** — recorded in the gate register above, with its limitation stated |
+
+**Note on the web witness:** the flutter DEV server's dwds debug socket failed repeatedly this session even on `127.0.0.1` (the D-006 workaround). The witness was taken against a **release build served statically** (`flutter build web` + `python -m http.server`), which has no debug socket at all. That is now the reliable way to witness UI — see trap 3d.
+
 ## What is next
 
-**Step 8 — UX profile screen + the FIDELITY TRANSFER GATE** (S8-*): the trait display with dispute/confirm controls, the persona header showing snapshot state and "profile changed — persona will rebuild", and the gate itself. **Carry the extraction-quality concern into it** — it is the thing this gate exists to catch, and it is now the oldest un-actioned observation in this document.
+**Step 9 — Candidate matching: embeddings, hard filters, and the analysis object.** Note two things waiting for it: **O-1** (`opt_in` observed changing pool membership) closes in Step 9 AC4, and **O-2** (the pinned-snapshot assertion in `probe_answer_edit.py`) closes in S9-P2. Step 9 also re-embeds every user through `google/gemini-embedding-001`, which is the one route still on google — expect trap 12a's daily cap.
 
 Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality), `carol@dating-test.dev` (no answers), plus disposable probe users.
 
@@ -186,6 +213,7 @@ Useful facts for later steps, learned witnessing Step 2:
 3a. **Serve the web app on `127.0.0.1`, never `localhost`** (D-006). `flutter run -d web-server --web-port 5000 --web-hostname 127.0.0.1`. Given the *name* `localhost`, Flutter binds IPv6-only on Windows and dwds' debug websocket dies — the page then hangs on a black screen at "DDC is about to load 740/740 scripts" with no error shown. CORS admits both spellings now, so `127.0.0.1` is simply the one that works.
 3b. **A Dart edit needs the dev server restarted** — a browser reload alone serves the stale bundle (this is how a `_minChars` change appeared not to apply). First compile is ~60–90s and the page is blank until it finishes; that blankness is normal, not a failure.
 3c. **Probes cannot see browser-only failures** (D-006). Every probe runs inside the api container, where there is no Origin header and no preflight. CORS, mixed content, cookies, websocket upgrades: the probe suite is GREEN straight through all of them. Reaching the API *from the browser* is its own witness step.
+3d. **When dwds will not co-operate, witness against a RELEASE BUILD, not the dev server.** `flutter build web` then `python -m http.server 5000 --bind 127.0.0.1` from `ux/build/web`. No debug websocket exists, so the whole dwds failure class disappears; it loads in about a second instead of ninety, and it is what the user would actually run. Cost: no hot reload, and you must rebuild after each Dart change. This is how Step 8 was witnessed after the dev server refused to boot the app repeatedly.
 4. **`.env` holds the DB password the volume was initialized with** — regenerate both together or neither.
 5. **The `questions` table has a forward reference** (`module_1_data_collection.md` A3): create `traits` before `questions`, or add the FK after both exist.
 6. **`profile_embeddings`: build the two-vector form** (`kind IN ('identity','preference')`, PK `(user_id, kind)`) — the revised copy, restated in `candidate_matching.md` §3.
@@ -210,6 +238,9 @@ Useful facts for later steps, learned witnessing Step 2:
 | O-2 | Pinned-snapshot assertion in `probe_answer_edit.py` | Step 6 | Step 9 (S9-P2) | **Anticipated** |
 | O-3 | Matching vs properly seeded demo profiles | Step 9 | Step 15 | **Anticipated** |
 | O-4 | Native (Windows) run rendering `/health` | Step 1, 2026-09-01 | Owner: Developer Mode + `flutter run -d windows` | **Owed** |
+| O-5 | Step 8 AC2/AC3 UI paths not yet clicked: the optimistic-update ROLLBACK on a forced server error, and the dispute deep-link through to answering the generated question | Step 8, **2026-09-01** | A browser pass with the API forced to fail | **Owed** |
+| O-6 | Step 8 AC4's stale→fresh flip: the header was witnessed in its `failed` state but not observed going "Profile changed" → rebuild → "up to date" | Step 8, **2026-09-01** | A browser pass after an answer edit | **Owed** |
+| O-7 | The fidelity gate re-run **by the owner on the owner's own account**. The gate asks you to count lines *you* would never say; this session could only assess against the account's written answers | Step 8, **2026-09-01** | Owner | **Owed** |
 
 *(Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
@@ -226,14 +257,26 @@ Useful facts for later steps, learned witnessing Step 2:
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 UX profile + **fidelity gate** ← **next** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching ← **next** · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 
 | Gate | Closes in | Status |
 |---|---|---|
-| Fidelity transfer | Step 8 | **Open** |
+| Fidelity transfer | Step 8 | **CLOSED 2026-09-01** — see the measurement below |
 | Quota fit | Step 11 → 12 | **Open** |
+
+### Fidelity transfer gate — the measurement (S8-G1, Step 8 AC7)
+
+**Model tested:** `openrouter/dots-studio/dots-3-note-preview:free` — the model `date_simulation` is routed to, deliberately pinned to the same model as `chat_reply` so calibration chat IS the date model rather than a stand-in. **Snapshot:** bob v3 (`ready`), digest by the same model. **Messages:** 6 persona replies over one calibration session, plus 1 more driven through the browser UI.
+
+**Result: 1 clear "I'd never say that" line out of 6, plus 1 borderline.**
+
+- **The clear failure — INVENTED BIOGRAPHY.** Asked "tell me something you're bad at", the persona answered *"I'm bad at cooking… I still managed to set off the smoke alarm making spaghetti last month."* Bob never wrote a word about cooking. His stated weaknesses are not noticing when someone wants comfort rather than a solution, and a pedantic streak. The persona did not merely miss the voice — **it fabricated a specific autobiographical anecdote**, which on a date would be a fact about the user that the user has never heard.
+- **The borderline.** Told "my dad's been in hospital", it replied with fluent emotional attunement. Bob explicitly wrote that he *offers a fix when someone wanted company*. The reply was better at comfort than Bob says he is — flattering, and therefore not him.
+- **The four that were right were VERY right:** the dealbreaker answer reproduced his own framing ("honest awkwardness over smooth charm I can't trust", rudeness to waiters, contempt); "slow to warm up, loyal to a fault, I remember the small stuff" came straight from his traits; the disagreement answer volunteered "I'm pedantic about details" and "I'd retreat into the garage" unprompted.
+
+**Honest limit on this measurement, stated because it changes what it is worth:** the gate as written says *count the lines **you** would never say*, and only the person themselves can do that. I am not Bob. This was assessed against the account's own written answers — a defensible proxy, not the real thing. **The owner should re-run this on their own account before any date output is trusted for judging.** What it does establish is that the pipeline transfers voice well enough to be worth judging, and that the specific failure mode to watch for is *fabricated concrete detail*, not blandness.
 
 ## Where the decisions live
 

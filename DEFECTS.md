@@ -204,3 +204,18 @@ The numbered, append-only defect ledger for this project (`development_principle
   2. **A mock that answers "nothing changed" is a better test of a start-then-poll UI than one that answers "done".** The happy-path fake (next GET already says `simulating`) is exactly the timing that hides this class of bug, and it is the timing every live witness so far had.
 - **Status:** closed (`kick()` in `core/polling/poller.dart`; both simulate call sites use it; the retry test asserts the poller keeps polling through a still-`failed` row and that the button is handed back rather than left spinning)
 - **Cross-refs:** `ux/lib/core/polling/poller.dart`, `ux/lib/features/analyses/analysis_screen.dart`, `ux/test/step13_results_test.dart`, PICKUP "Things worth not re-deciding" for Step 13.
+
+---
+
+## D-014 — the chat give-up path 500ed on its first forced run: a rollback expired the row the log line was about to read
+
+- **Date:** 2026-09-01
+- **Repo:** `server`
+- **Surfaced in:** Step 14, forcing the S14-B10 give-up by pointing `chat_reply` at a nonexistent model.
+- **Mechanism:** `reply()` in `app/chat.py` was written to roll the user's message back when the Guard gives up, then log `chat_reply_failed` with `user_id=str(convo.user_id)`. `session.rollback()` expires every attribute of every loaded ORM row, so that read became a lazy load — and a lazy load from async code raises `MissingGreenlet`. The exception fired INSIDE the `except AIError` block, so the honest 502 never happened: the client got a generic 500 `internal_error`, and the §7 failure line was never written. The rollback itself had worked (the user's message was not stored), which made the symptom look like "the error envelope is wrong" rather than "the log line crashed".
+- **Discovery method:** The forced run, not a test — `test_chat_rules.py` pins the pure rules and cannot see a session. Same shape as D-010: the branch that logs is itself code, and it had never executed. Reproduced in one request, fixed by capturing the two ids into locals before the call.
+- **Lesson:** Two.
+  1. **After `rollback()` (or `commit()` without `expire_on_commit=False`), an ORM object is a set of pending lazy loads, and in async SQLAlchemy each one is an exception.** Anything a failure path needs to say about a row must be read into plain values BEFORE the operation that can fail. The same rule already holds implicitly in the pipeline (`expire_on_commit=False` on its sessionmaker); the request session does not have that setting, and this is the first failure path to log after a rollback on it.
+  2. **Force every give-up once, on the day it is written** (§17, §7). This one was thirty seconds to force and would otherwise have shipped as "the chat says something went wrong on our side" on the first bad model day, with nothing in the log to say why.
+- **Status:** closed (ids captured before the Guard call; the forced run now returns `502 reply_failed`, the user's message is not stored, and `chat_reply_failed` logs provider, model, outcome and the error)
+- **Cross-refs:** `server/app/chat.py`, D-010, PICKUP trap 23.

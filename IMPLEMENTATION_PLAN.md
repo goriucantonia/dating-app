@@ -192,7 +192,7 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 1. First boot on an empty database logs 35 questions seeded; `SELECT count(*) FROM questions WHERE user_id IS NULL` returns 35.
 2. **Second boot logs a no-op** and inserts nothing — the state-consuming run required by `§1`.
 3. Deleting one pool row and rebooting restores exactly that row and logs the repair (reconciliation, not a fresh-install path).
-4. Every CHECK constraint is proven by a rejected insert: an answer under 200 characters, an `age_pref_max < age_pref_min`, a `pool` question with a NULL `pool_order`, a `dispute` question with a NULL `trait_id`, an `interested_in` of length zero.
+4. Every CHECK constraint is proven by a rejected insert: an answer under 50 characters, an `age_pref_max < age_pref_min`, a `pool` question with a NULL `pool_order`, a `dispute` question with a NULL `trait_id`, an `interested_in` of length zero.
 5. `pgvector` accepts a 768-dimension insert into `profile_embeddings` and rejects a wrong-dimension one.
 6. The seeded question text is diffed against `module_1_data_collection.md` and is identical.
 
@@ -250,7 +250,7 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 - **S5-B1** `GET /questions` — everything answerable by this user (baseline + pool + their own dispute questions), each with answered/unanswered state and the answer text when present. This one endpoint drives save/resume **and** the edit view (A4).
 - **S5-B2** `GET /questions/next-batch` — up to 5 unanswered **pool** questions ordered by `pool_order`, plus `progress: {answered_pool, total_pool}`. The answer set *is* the cursor; there is no assignment table.
 - **S5-B3** `pool_exhausted`: when all 30 are answered, return `{status: 'pool_exhausted', questions: [], progress: {answered_pool: 30, total_pool: 30}}` — a **normal payload with a status field, not a 4xx** (`communication_protocol.md` §5; A5.4).
-- **S5-B4** `PUT /answers/{question_id}` — one upsert path for the first write and every later edit, `updated_at` bumped on edit. The 200-character minimum applies to baseline, pool, **and** dispute answers (`§18` — the scope is written down because a rule written for one case is a trap in the case it did not consider).
+- **S5-B4** `PUT /answers/{question_id}` — one upsert path for the first write and every later edit, `updated_at` bumped on edit. The 50-character minimum (owner decision 2026-09-01, lowered from 200) applies to baseline, pool, **and** dispute answers (`§18` — the scope is written down because a rule written for one case is a trap in the case it did not consider).
 - **S5-B5** Answer-edit logging (`§7`): old/new length, and the trait IDs whose `source_answer_ids` include the edited answer.
 - **S5-B6** Dispute questions do **not** count toward `answered_pool` — they are per-user and outside pool progress (`§13`: this is one of the named traps; do not assume all questions behave like pool questions).
 

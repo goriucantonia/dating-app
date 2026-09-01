@@ -65,7 +65,7 @@ One error envelope everywhere:
 
 - `code` is a stable machine string the UI can branch on; `message` is already user-readable, in layman's terms (§26 of the principles) — the UI may show it verbatim.
 - `409` = a state rule, not a failure: analysis already running, analysis not `complete` yet, already selected. The UI pre-empts these where it can and renders them as state, never as error toasts.
-- `422` = validation (answer under 200 characters, age range invalid) — field-level, mirrored client-side so it's rare in practice.
+- `422` = validation (answer under 50 characters, age range invalid) — field-level, mirrored client-side so it's rare in practice.
 - Defined "empty" states are **not errors and not `4xx`**: `pool_exhausted` and `no_candidates` come back as normal payloads with a status field, because they're product states with their own UI, not failures.
 - `5xx` / structured-output give-ups surface as an honest "that didn't work, try again" with a retry that is safe by design (server-side checkpoints make retries resume, not restart).
 

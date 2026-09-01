@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 6 (trait extraction) is DONE with all seven acceptance criteria witnessed**, and — owner decision — **`gemini-3.6-flash` is now used for nothing**: every chat/structured task runs on `openrouter/dots-studio/dots-3-note-preview:free`, chosen by measuring four candidates against the real schema. Embeddings stay on google. D-007 (profile drift on re-reads) found by the drift alarm and closed. One honest caveat carried forward: extraction QUALITY on the free model is a visible step down — read the fidelity note. **Next: Step 7, persona snapshots.**
+**Last updated:** 2026-09-01 · **Updated because:** **Step 7 (persona compilation, snapshots, `agent_response.v1`) is built and witnessed** — `probe_onboarding.py` GREEN over 16 checks, immutable per-user versioned snapshots, the system prompt never leaving the server, calibration chat working, and flags feeding the next compilation as negative examples. D-008 found and closed: one OpenRouter model id is several upstream providers and one of them broke `trait_extraction` outright. **Next: Step 8, UX profile + the fidelity gate.**
 
 ---
 
@@ -18,8 +18,8 @@ The one document that tells someone with no memory of the last session where thi
 
 | Model | Result |
 |---|---|
-| `dots-studio/dots-3-note-preview:free` | **PASS**, 28s, short well-shaped labels — **chosen** |
-| `nvidia/nemotron-3-super-120b-a12b:free` | PASS, 19s, but labels are full sentences and it splits one answer into three traits |
+| `dots-studio/dots-3-note-preview:free` | **PASS**, 28s, short well-shaped labels — **chosen for `persona_digest`, `judging`, `dispute_followups`, `chat_reply`** |
+| `nvidia/nemotron-3-super-120b-a12b:free` | **now carries `trait_extraction`** after D-008 broke the model above for that one task |
 | `z-ai/glm-5.2:free` | FAIL — 429 saturated (as in Step 2) |
 | `liquid/lfm-2.5-2.6b:free` | 2.6B, too small to trust with this |
 
@@ -32,7 +32,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: Step 7 — Persona compilation and snapshots** (S7-B1…B11, S7-P1, S7-U1…U3). Detailed below under "What is next". Step 6 is done bar two owed witnesses (O-5, O-6).
+**Next: Step 8 — UX profile screen and the FIDELITY TRANSFER GATE.** Steps 1–7 are all done and witnessed.
 
 ---
 
@@ -76,6 +76,7 @@ dating_app_ai\                      ← superproject
 | Step 4 accounts | **Witnessed** — register/login/JWT/`/me`/PATCH with every A1 rule server-side (curl) and the whole flow through the Flutter UI in the browser; session restore across app restarts; dead sessions land on `/login` | This session's curl output + browser screenshots |
 | Seed fidelity | **Witnessed** — `scripts/check_question_seeds.py` GREEN: plan ↔ `seeds/questions.yaml` ↔ DB identical, 35 questions | script verdict |
 | Step 6 extraction | **Witnessed, all 7 ACs** — provenance; all-`keep` second run with byte-identical hash; confirmed trait survives an edit; dispute makes exactly one linked question; 4 traits retracted and still present when an answer's subject was replaced; live one-`done`-one-`queued`; thin answers declined | probe + curl + psql this session |
+| Step 7 persona | **Witnessed, all 7 ACs** — ready v1 with verbatim excerpts; v1/v2/v3 immutable; §11 gate; forced failure leaves the previous current; no prompt on the wire; flags reach the next compilation | probe + curl + psql this session |
 | Unit tests | **15 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up) | pytest output |
 | Lint / build | **one pre-existing ruff error**: `RUF100` unused `# noqa: E402` in `migrations/env.py` — untouched by recent work, not yet fixed; image rebuilt green after D-004 editable-install fix | in-container runs |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
@@ -134,9 +135,32 @@ dating_app_ai\                      ← superproject
 
 **Honest note on extraction QUALITY, for the fidelity gate (Step 8):** the mechanics are green but the new model is a visible step down from what google produced on the same answers. Gemini gave **6 traits across 5 categories** with short labels (`restores old cars`). `dots-3-note-preview` gave **17 traits across only 2 categories** with snake_case labels (`accepts_being_seen_as_predictable`) — it over-splits and under-categorises. Nothing downstream is broken by this, but a persona built from 17 lopsided traits will read worse than one built from 6 balanced ones. **This is exactly what the fidelity-transfer gate exists to catch — carry it into Step 8 rather than treating the green probe as the whole story.**
 
+## What was just finished (Step 7, all backend tickets + UX)
+
+**Server (S7-B1…B11):** migration `0004` (`persona_snapshots`, `calibration_sessions`, `calibration_messages` verbatim from §4). `app/schemas/agent_response.py` — the Step 1 loud stub replaced by the FROZEN `agent_response.v1` including `wants_to_end`. `app/persona.py` — the two-part compiler and `PersonaService`. `app/routers/persona.py` — `POST /persona/compile` (start-then-poll), `GET /persona/current`, and the three calibration endpoints. **Probe:** `probes/probe_onboarding.py` GREEN over 16 checks.
+
+**UX (S7-U1…U3):** `features/persona/` — models, repository, and `BuildingScreen` at `/onboarding/building`: the post-BQ5 chain (extract → compile → poll) with the stage label naming the REAL stage from job status, never a fake timer. Failure is visible and retryable and the copy says the answers are safe. The router guard lets `/onboarding/building` through while the questions provider still reports "incomplete", or it would bounce the user back into a questionnaire they just finished.
+
+**Things worth not re-deciding:**
+- **The system prompt has no field anywhere on the way out.** `SnapshotOut` lists its fields explicitly rather than dumping the row, so no future edit can widen it into leaking the user's raw answers. The probe asserts this against the raw response body.
+- **The 3–5 voice excerpts are picked by SPREAD first, then length.** Taking the five longest answers outright returns five answers about the same probe area, and the voice sample then only shows how they write about one subject. Deterministic — a snapshot that re-rolls its quotations per compile is not reproducible.
+- **Auto-compile after extraction is gated on `outcome.changed`**, which reads the SAME `traits_hash` as the staleness rule — so the trigger and the staleness banner can never disagree about whether a rebuild is owed, and an all-`keep` run does not burn an AI call to rebuild an identical persona.
+
+### Step 7 acceptance criteria — all witnessed
+
+| AC | Status |
+|---|---|
+| 1 ready v1 whose prompt contains verbatim excerpts | **Witnessed** — probe asserts the user's own words, and specifically the EDITED BQ1 rather than the superseded draft |
+| 2 `probe_onboarding.py` green end-to-end | **Witnessed** — GREEN, 16/16 |
+| 3 edit → re-extract → recompile gives v2; v1 unchanged and readable | **Witnessed** — bob carries v1, v2, v3 all `ready` with their prompts intact |
+| 4 no ready snapshot → `None`; the §11 gate | **Witnessed** — a fresh user is `simulatable: false` and calibration refuses with `no_persona_yet` (409) |
+| 5 forced digest failure → `failed` + error, PREVIOUS stays current | **Witnessed** — digest pointed at a nonexistent model: v4 `failed` with its error, v1–v3 untouched, `simulatable` still true |
+| 6 `GET /persona/current` never contains the prompt | **Witnessed** — checked against the raw response body, 0 matches |
+| 7 a flag is stored against the right snapshot and appears in the next compilation | **Witnessed** — v1/v2 have no negatives; v3, compiled after the flag, carries both the "THINGS YOU WOULD NEVER SAY" section and the user's correction verbatim |
+
 ## What is next
 
-**Step 7 — Persona compilation, snapshots, and `agent_response.v1`** (S7-B1…B11, S7-P1, S7-U1…U3): the `persona_snapshots` / `calibration_sessions` / `calibration_messages` migration, `agent_response.v1` frozen in `app/schemas/agent_response.py` (the loud stub is already there), the two-part `PersonaCompiler` (code-assembled facts + 3–5 VERBATIM answer excerpts — no model paraphrase between the user's writing and the mimicry — plus one structured digest call), immutable per-user snapshot versioning, `get_current_snapshot() is None` as a hard gate, calibration endpoints, and `probe_onboarding.py`.
+**Step 8 — UX profile screen + the FIDELITY TRANSFER GATE** (S8-*): the trait display with dispute/confirm controls, the persona header showing snapshot state and "profile changed — persona will rebuild", and the gate itself. **Carry the extraction-quality concern into it** — it is the thing this gate exists to catch, and it is now the oldest un-actioned observation in this document.
 
 Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality), `carol@dating-test.dev` (no answers), plus disposable probe users.
 
@@ -173,6 +197,8 @@ Useful facts for later steps, learned witnessing Step 2:
 12. **An all-`keep` extraction run leaves everything fresh** (A5.1); **the 30-message cap counts environment rows** (§18).
 12a. **The google free tier behaves as a DAILY cap** (found in Step 6): `gemini-3.6-flash` returns `limit: 20` and did not clear across a 75-second wait. It blocked two witnesses outright and is the direct reason chat moved to OpenRouter. Still live knowledge because **embeddings remain on google** — Step 9 will re-embed users and will meet this cap. Carry it into the quota-fit gate.
 12b. **Free OpenRouter models are slow and wildly variable** — `dots-3-note-preview` runs ~20-40s per extraction but the whole class queues under congestion, and `z-ai/glm-5.2:free` is reliably 429. Budget minutes, not seconds, for anything that chains several calls. **`--web-port`-style quick loops do not apply here: a probe with four extractions takes several minutes.**
+12c. **An OpenRouter model id is NOT one thing** (D-008). It is served by several upstream providers, chosen per request, with different implementations. `dots-3-note-preview` served `trait_extraction` for a whole step and then began 400ing every such request via one upstream while serving other tasks fine on the same key. Consequences already in the code: a `"Provider returned error"` 400 is TRANSIENT and retries (a retry is a fresh routing draw), and **`trait_extraction` is deliberately pinned to a DIFFERENT model from everything else** — per-task routing is what stops one broken provider forcing a global change. **"Model X works" is not a durable fact.** Re-measure; don't reason.
+12d. **Debug provider faults by isolation, not by theory.** Three plausible explanations (schema too big, max_tokens, prompt size) were each falsified in about a minute by a script varying one factor at a time. Reasoning about them would have taken longer and settled nothing.
 13. **Ruff's `EXE002` is suppressed on purpose** — through the Windows bind mount every file looks executable; do not "fix" it by chmod.
 14. **Decided things stay decided** (§23).
 
@@ -195,11 +221,12 @@ Useful facts for later steps, learned witnessing Step 2:
 | `probe_pool_expansion.py` | **GREEN** (2026-09-01) |
 | `probe_ai_smoke.py` (helper, not in the §2 minimum set) | **GREEN** (2026-09-01; openrouter model passed as argument) |
 | `probe_answer_edit.py` | **GREEN** (2026-09-01, S6-P1/P2 — real AI calls) |
-| All others (`onboarding`, `matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 7–15 |
+| `probe_onboarding.py` | **GREEN** (2026-09-01, S7-P1 — 16 checks, real AI calls) |
+| All others (`matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 9–15 |
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 Persona & snapshots ← **next** · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 UX profile + **fidelity gate** ← **next** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 

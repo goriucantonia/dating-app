@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Steps 11 and 12 are both built, and BOTH GATES ARE NOW CLOSED.** Step 12's seven acceptance criteria are all witnessed and the quota-fit gate closed on a real end-to-end run: `POST /analyses` → matching → two 30-message dates → judging → `complete`, in **59 model calls and 7m13s with zero retries**. The judge re-scored the same transcript with a **delta of 0.00**. Step 11 carries two deliberately-deferred witnesses (O-13, O-14) and **Step 9's O-8 is still owed**. Three defects found by running things: D-010, D-011, D-012.
+**Last updated:** 2026-09-01 · **Updated because:** **Steps 11 and 12 are built, both gates are CLOSED, and the caps were then revised by the owner: ONE date per candidate, not two.** Candidates A, B and C now get one evening each — 3 dates per analysis, not 6. Measured on a real run afterwards: **30 model calls per candidate** (1 scenario + 28 turns + 1 judge), so a full pool is **~90 calls and ~11 minutes**, down from ~177 and ~21. The empty-intersection fallback had to be rewritten — its old rule needed two settings — and `date_scenarios` is now **v2**. Step 9's O-8 is still owed; O-13 and O-14 are deliberately deferred. Defects this session: D-010, D-011, D-012.
 
 ---
 
@@ -244,7 +244,7 @@ dating_app_ai\                      ← superproject
 
 Fixing the server half first is exactly why the symptom survived into a second attempt looking unchanged. This closes the open question PICKUP has carried since Step 5.
 
-## What was just finished (Step 11 — date simulation, built and largely witnessed)
+## What was just finished (Step 11 — date simulation, built and largely witnessed; caps REVISED)
 
 **Server (S11-B1…B12):** migration `0006` (`dates`, `date_messages` verbatim from §3 — `analyses.progress` was already added by `0005`). `app/schemas/date_scenarios.py` — `date_scenarios.v1`. `app/simulation.py` — the whole module: scenario generation with the empty-intersection fallback, the turn loop, event injection, the give-up ladder, resume, the global semaphore, and progress. `app/routers/simulation.py` — `POST /analyses/{id}/simulate`, `GET /analyses/{id}/dates`, `GET /dates/{id}/transcript`. `app/reconcile.py` gains **step 3 of the pass**: on every boot, any analysis left in `matching` or `simulating` is relaunched.
 
@@ -258,6 +258,8 @@ Fixing the server half first is exactly why the symptom survived into a second a
 
 ### Things worth not re-deciding
 
+- **ONE date per candidate, revised 2026-09-01 by the owner** (was two). `DATES_PER_CANDIDATE` is now derived from the schema's `SETTINGS_PER_CANDIDATE` rather than written out separately — one generated setting IS one date, and two constants that must agree are two constants that will eventually disagree. **The cost is named:** a candidate's score used to be the mean of two independent readings, so one odd evening or one wobbly judge call got averaged down; now a single date fully determines it. Bought for roughly half the model calls.
+- **The empty-intersection fallback had to be rewritten, and this is the part that is easy to miss.** Its old rule was "one setting anchored in HER interests and one in HIS" — an instruction that needs two settings and became impossible the moment a candidate got one date. It now anchors on the **CANDIDATE's** interests, so a requester working through a full pool is shown three different people's worlds rather than three versions of their own. The anchor vocabulary offered to the model is the candidate's list ONLY; leaving the requester's in would quietly re-open the choice the fallback exists to make.
 - **The transcript IS the state, and every rule is a pure function of it.** Whose turn it is, how many events have fired, whether the pair have started saying goodbye, which of the two endings finished the date — all recomputed from the stored rows on every pass. There is no in-flight object a restart could lose, which is *why* resume works rather than a bonus on top of it. It is also why 29 unit tests can pin behaviour that would otherwise need a live model to observe.
 - **Whose turn it is comes from the COUNT of agent messages, not from "who spoke last."** An environment row sits between two turns; if it were read as "the last speaker", the two agents would swap sides mid-date.
 - **The 30-message cap counts environment rows** (§18) and there is a unit test that constructs exactly that boundary — 27 spoken plus 3 events — because this is the rule someone later "fixes" into counting only what was said.
@@ -270,7 +272,7 @@ Fixing the server half first is exactly why the symptom survived into a second a
 
 | AC | Status |
 |---|---|
-| 1 a full simulation produces dates with real transcripts | **Witnessed on three separate analyses** — 6 dates in total, 136 stored messages, agents visibly reacting to injected events ("Power's out, so I'll grab the flashlight"). Every pool was `partial` (one candidate), so "up to 6 dates" is shown at 2 per analysis rather than 6 in one |
+| 1 a full simulation produces dates with real transcripts | **Witnessed on four separate analyses** — 13 dates in total, agents visibly reacting to injected events ("Power's out, so I'll grab the flashlight"). Every pool was `partial` (one candidate). The first three ran under the old 2-dates-per-candidate cap; the fourth ran after the 2026-09-01 revision and produced exactly ONE date, judged and scored |
 | 2 killed mid-date, restarts, **continues from the last checkpointed message** | **Witnessed four times, and asserted by the green probe.** `probe_simulation_resume.py` SIGKILLs the API at 3 messages and then checks that the pre-kill prefix is present byte for byte in the same order and that the date GREW from it — `3 → 30`. The other three were: the same probe's earlier run, an accidental uvicorn reload mid-date (trap 3e, resumed at seq 17), and the AC5 fault injection (resumed at seq 11). Every one named the seq it resumed from and who was due to speak |
 | 3 event injection observed; max-3 and no-consecutive both observed holding | **Witnessed, and asserted by the green probe on every date it checks.** Every roll is logged with its value, the threshold, and the reason it did or did not fire; a date reached exactly 3 events and the next roll logged `reason: event_cap_reached`; the roll after each event logged `reason: no_consecutive_events`. Speaker pattern of one full date: `UCUECUCUCUCUCUCUCUCEUCUCUCUCEU` |
 | 4 a date ends by mutual `wants_to_end` at least once, and by cap at least once | **Both witnessed, both logged with which mechanism fired.** `cap` on four dates (`ended_by: cap`, 30 messages). `mutual_wants_to_end` on date `b6a54d43` at **25 messages** — and the closing exchange behaved exactly as designed: `seq 22` user_agent sets the flag, `seq 23` candidate_agent sets it, then EXACTLY two more turns, one goodbye each ("Let's call it a night. I've got that Raleigh waiting for me" / "it was nice meeting you… maybe we'll cross paths again"), and stop |
@@ -342,7 +344,7 @@ Useful facts for later steps, learned witnessing Step 2:
 |---|---|---|
 | Native desktop witness (O-4) | **Owner:** enable Windows Developer Mode, then `flutter run -d windows` in `ux\` | Unchanged from last session |
 | OpenRouter `free-model-of-choice` slots | **Owner decision, deferred by design** — EXCEPT `dispute_followups`, filled 2026-09-01 with `nvidia/nemotron-3.5-lightning:free` so Step 6 AC4 could be witnessed. Four slots remain unfilled | Probe takes a model as an argument precisely so the slots stay unfilled |
-| Paid-balance question | **Owner**, and the numbers are now in | **Decisive.** One full analysis = ~171 openrouter calls. On the free tier as documented (50/day) the product's core loop cannot run ONCE. 10 credits raises the allowance to 1000/day ≈ 5 analyses/day. See the spreadsheet below |
+| Paid-balance question | **Owner**, and the numbers are now in | **Decisive, and improved by the one-date revision.** A full analysis is now ~90 openrouter calls (was ~177). On the free tier as documented (50/day) the core loop still cannot run ONCE. 10 credits raises the allowance to 1000/day ≈ **11 analyses a day**, up from 5. See the spreadsheet below |
 | Hosting / CORS / auth posture | **Owner, explicitly deferred** | Unchanged (decision log #11) |
 
 ## Traps that will bite you resuming cold
@@ -443,29 +445,33 @@ The gate asks for calls-per-analysis against the providers' caps, as a spreadshe
 | `date_simulation` (one turn) | openrouter / dots-3-note-preview | **7.5 s** (max 29.7) | 38 |
 | `embeddings` (both vectors, one batch) | google / gemini-embedding-001 | 0.74 s | 2 |
 
-**One analysis, full pool (3 candidates × 2 dates = 6 dates)**
+**One analysis, full pool (3 candidates × 1 date = 3 dates)** — REVISED 2026-09-01
 
 | Stage | Calls | Provider | Wall clock |
 |---|---|---|---|
 | Re-embed requester + 3 candidates | up to **4** | google | ~3 s |
 | Scenario generation, 1 per candidate | **3** | openrouter | ~1.5 min |
-| Date turns — 27 per date × 6 | **162** | openrouter | **~20 min** |
-| Judging, 1 per completed date (Step 12) | **6** | openrouter | ~2 min |
-| **Total** | **171 openrouter + 4 google** | | **~24 min** |
+| Date turns — 28 per date × 3 | **84** | openrouter | **~9 min** |
+| Judging, 1 per date | **3** | openrouter | ~1 min |
+| **Total** | **90 openrouter + 4 google** | | **~11 min** |
 
-27 turns per date, not 30: the 30-message cap counts environment rows, and a date that fires its full 3 events spends 3 of its 30 slots on them. A date with no events costs 30 turns, so the honest range is **171–189 openrouter calls per analysis**. The plan's pre-build estimate was ~190 — it was a good estimate.
+**These are measured, not scaled.** One candidate end to end costs exactly **30 calls** (1 scenario + 28 turns + 1 judge), counted from the logs of a real run on 2026-09-01 after the revision. Multiply by the pool size.
 
-Onboarding one person, for comparison, is **2 calls** (extract + compile). An analysis costs about **as much as 85 onboardings.**
+28 turns, not 30: the cap counts environment rows, and a date that fires two events spends two of its thirty slots on them. A date with no events costs 30 turns, so the honest range is **90–96 openrouter calls per full analysis**.
+
+**Before the 2026-09-01 revision** the same table read 171–189 calls and ~24 minutes, at two dates per candidate. The owner halved it by halving the dates.
+
+Onboarding one person, for comparison, is **2 calls** (extract + compile). A full analysis costs about **as much as 45 onboardings.**
 
 **Against the caps**
 
 | Allowance | Analyses per day | Verdict |
 |---|---|---|
-| OpenRouter free tier, as documented (50/day) | **0.3** | **A single analysis cannot complete.** It needs 3.4× the whole day's allowance |
-| OpenRouter with 10 credits added (1000/day) | **~5** | Workable — and 5 full analyses a day is more than a friends-scale app needs |
+| OpenRouter free tier, as documented (50/day) | **0.55** | **A single analysis still cannot complete.** It needs 1.8× the whole day's allowance — better than the 3.4× before the revision, and still short |
+| OpenRouter with 10 credits added (1000/day) | **~11** | Comfortable for a friends-scale app |
 | google embeddings | not the constraint on volume — but see the per-minute cap below | |
 
-**The decision this spreadsheet forces:** on the free tier as documented, the product's core loop **cannot run once**. This is no longer a development-velocity problem (last session's framing) — it is the feature. The remedy is the one named in OpenRouter's own 429 body: **adding 10 credits raises the free-model allowance to 1000/day**, which buys ~5 full analyses a day. That is the owner's call and it is now backed by measurement.
+**The decision this spreadsheet forces:** on the free tier as documented, the product's core loop **still cannot run once** — 90 calls against a 50/day allowance. Halving the dates halved the cost and did not change that conclusion, it only moved the shortfall from 3.4× to 1.8×. The remedy is the one named in OpenRouter's own 429 body: **adding 10 credits raises the free-model allowance to 1000/day**, which buys ~11 full analyses a day. That is the owner's call and it is now backed by measurement.
 
 ### Correction: the "50 free calls per day" figure is not what it looks like
 
@@ -499,11 +505,13 @@ The retry schedule was the reason it was fatal rather than slow: the resilience 
 
 56 turns for 60 stored messages: the other 4 are environment rows, which take a slot but no call.
 
-**Against the Step 11 spreadsheet.** The estimate for this shape (1 candidate, 2 dates) was 1 + 54 + 2 = **57 calls**; the measurement is **59**, 3.5% high, because only 2 events fired instead of the 3 the estimate assumed. Scaled to a full pool (3 candidates, 6 dates) the measurement gives **~177 calls and ~21 minutes**, refining Step 11's 171. The estimate was good and the gate does not change the conclusion — it sharpens it.
+**Against the Step 11 spreadsheet.** The estimate for this shape (1 candidate, 2 dates) was 1 + 54 + 2 = **57 calls**; the measurement is **59**, 3.5% high, because only 2 events fired instead of the 3 the estimate assumed. The estimate was good.
+
+**This run predates the one-date revision.** It is kept as the gate's closing evidence because that is what closed it — a complete pipeline against real providers, on the caps in force at the time. A second run after the revision produced **one** date for the same pair at **30 calls**, judged and scored, confirming the pipeline is unchanged by the cap and giving the per-candidate figure the spreadsheet above now uses.
 
 **What the gate asked, and the answer:** *can one full pipeline complete against the real providers without exhausting a daily cap?* **Yes — and it did.** 59 calls, zero retries, zero rate-limited responses, in seven minutes.
 
-**But read the number the other way before relaxing.** 59 calls is a `partial` pool with ONE candidate. A full pool is ~177, and the documented free-model allowance is 50 a day. **This run only succeeded because the free tier is not behaving like the 50/day counter it advertises** (see the correction above) — it is not evidence that the free tier is sufficient, it is evidence that the pipeline is efficient and correct. The paid-balance decision stands exactly where the Step 11 spreadsheet left it, now with a completed run behind it rather than an estimate.
+**But read the number the other way before relaxing.** 59 calls was a `partial` pool with ONE candidate, at two dates each. Even after the revision a full pool is ~90, and the documented free-model allowance is 50 a day. **This run only succeeded because the free tier is not behaving like the 50/day counter it advertises** (see the correction above) — it is not evidence that the free tier is sufficient, it is evidence that the pipeline is efficient and correct. The paid-balance decision stands exactly where the Step 11 spreadsheet left it, now with a completed run behind it rather than an estimate.
 
 ### Fidelity transfer gate — the measurement (S8-G1, Step 8 AC7)
 

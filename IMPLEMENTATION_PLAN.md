@@ -504,20 +504,20 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 
 ### Technical Tasks — Gate
 
-- **S11-G1** **Quota fit check** (`ai_interaction.md` §3, gate 1) — before running the first full pipeline. Calls-per-analysis (~190 at 2 dates/candidate) against the chosen providers' **per-minute and per-day** caps, as a spreadsheet, and the paid-balance decision made from it. Record in `PICKUP.md`. The spreadsheet opens the gate; the end-to-end run in Step 12 closes it.
+- **S11-G1** **Quota fit check** (`ai_interaction.md` §3, gate 1) — before running the first full pipeline. Calls-per-analysis (~190 at the original 2 dates/candidate; ~90 after the 2026-09-01 revision to 1) against the chosen providers' **per-minute and per-day** caps, as a spreadsheet, and the paid-balance decision made from it. Record in `PICKUP.md`. The spreadsheet opens the gate; the end-to-end run in Step 12 closes it.
 
 ### Technical Tasks — Server/Backend
 
 - **S11-B1** Alembic migration: `dates`, `date_messages`, and `analyses.progress JSONB`, verbatim from `date_simulation.md` §3.
-- **S11-B2** Scenario generation — one structured AI call per candidate: input `shared_interests` + both users' interest traits; output **2 distinct settings**, each `{setting_name, description, sensory_details, possible_events[4-6]}`.
-- **S11-B3** The **empty-intersection fallback**: when `shared_interests` is empty, the prompt receives both interest lists and must produce one setting anchored in each person's interests (one "hers", one "his"). This was flagged open in `candidate_matching.md` and closed in `date_simulation.md` §2 — do not leave it to chance.
+- **S11-B2** Scenario generation — one structured AI call per candidate: input `shared_interests` + both users' interest traits; output **1 setting** `{setting_name, description, sensory_details, anchored_in_interest, possible_events[4-6]}`. *(REVISED 2026-09-01, owner decision: one date per candidate. Was 2 distinct settings.)*
+- **S11-B3** The **empty-intersection fallback**: when `shared_interests` is empty, the setting is anchored in the **candidate's** interests, and `anchored_in_interest` records which. *(REVISED 2026-09-01 with S11-B2: the old "one hers, one his" needs two settings.)* This was flagged open in `candidate_matching.md` and closed in `date_simulation.md` §2 — do not leave it to chance.
 - **S11-B4** The turn loop per date, in the locked order:
   1. Compose context: the agent's **frozen snapshot's** system prompt + scenario description + date-role preamble + the full transcript so far (30 messages fits any context window — **no summarisation inside a date**).
   2. One structured call → `agent_response.v1` through the Guard.
   3. **Persist the message row (checkpoint) *before* advancing the turn** (`§19` — this ordering is a mechanism, never to be "simplified").
   4. Event injection **before each turn**: roll p = 0.15, **max 3 events per date, never two in a row**; on a hit insert an `environment` row from the scenario's `possible_events`, visible to both agents.
   5. Natural ending: when both agents' latest `wants_to_end` are true, run **one final closing exchange** and stop; otherwise stop at the cap.
-- **S11-B5** Caps, exactly: **2 dates per candidate, max 6 per analysis, 30 messages per date** — and the 30-message cap **counts environment rows as messages** (`§18`, the scope is written down).
+- **S11-B5** Caps, exactly: **1 date per candidate, max 3 per analysis, 30 messages per date** *(REVISED 2026-09-01, owner decision; was 2 and 6)* — and the 30-message cap **counts environment rows as messages** (`§18`, the scope is written down).
 - **S11-B6** Per-turn give-up ladder (`§17`): 3 attempts with backoff → the date is marked `incomplete` at its last checkpointed message → the pipeline moves to the next date. **The analysis never dies because one date did.**
 - **S11-B7** In-process asyncio tasks, **no Celery/Redis** (named trade); sequential dates; a **global semaphore of 2** concurrent pipelines across all users.
 - **S11-B8** Resume semantics, idempotent by construction: on pipeline (re)start, `pending` → run from scratch; `running` → continue from `max(seq)` (the transcript **is** the state); `complete`/`incomplete` without an evaluation → judge it (Step 12).
@@ -536,12 +536,12 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 
 ### Acceptance Criteria
 
-1. A full simulation runs on the stack against real models and produces up to 6 dates with real transcripts.
+1. A full simulation runs on the stack against real models and produces up to 3 dates with real transcripts (one per candidate; was 6 before the 2026-09-01 revision).
 2. `probe_simulation_resume.py`: the server is killed mid-date, restarts, and the date **continues from its last checkpointed message**. Watched, not inferred (`§1` — this is the product, not a corner case).
 3. Event injection is observed: the roll appears in the logs, an `environment` row exists, the agents' next turns react to it, and the **max-3 and no-consecutive** rules are both observed holding (`§8`, `§14`).
 4. A date ends by mutual `wants_to_end` at least once, and by cap at least once — both endings logged with which mechanism fired.
 5. A forced 3-attempt failure marks that date `incomplete` at its last good message and the pipeline continues to the next date (`§17` observed).
-6. The empty-intersection fallback is exercised with a candidate sharing zero interest labels, producing two settings anchored one in each person's interests.
+6. The empty-intersection fallback is exercised with a candidate sharing zero interest labels, producing a setting anchored in the **candidate's** interests, with `anchored_in_interest` naming which one. *(REVISED 2026-09-01 with S11-B2/B3.)*
 7. The global semaphore of 2 is observed limiting concurrency with three analyses queued.
 8. The quota-fit spreadsheet exists in `PICKUP.md` with real numbers.
 
@@ -577,7 +577,7 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 
 ### Technical Tasks — Gate
 
-- **S12-G1** **Close the quota-fit gate**: one full end-to-end analysis (matching → 6 dates → judging → complete) completed against the real providers without exhausting a daily cap. Record the actual call count against the spreadsheet estimate in `PICKUP.md`.
+- **S12-G1** **Close the quota-fit gate**: one full end-to-end analysis (matching → up to 3 dates → judging → complete; was 6 before the 2026-09-01 revision) completed against the real providers without exhausting a daily cap. Record the actual call count against the spreadsheet estimate in `PICKUP.md`.
 
 ### Acceptance Criteria
 
@@ -603,7 +603,7 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 ### Technical Tasks — UX/Frontend
 
 - **S13-U1** `/analyses/:id` phase 3 `simulating`: multi-stage progress fed by the server's `progress` JSONB through the shared Poller — **real stage names, never a fake percentage bar**.
-- **S13-U2** A checklist grid of the (up to) 6 dates: pending / running / complete / **incomplete-with-reason**.
+- **S13-U2** A checklist grid of the (up to) 3 dates — one per candidate since 2026-09-01: pending / running / complete / **incomplete-with-reason**.
 - **S13-U3** **Completed dates unlock immediately** — transcripts are readable while later dates still run (named trade: the data is already checkpointed, so this is free, and it turns a dead wait into the product's best moment).
 - **S13-U4** The prominent affordance: "You can leave — this keeps running." On `complete`, a local notification (mobile/desktop) and an in-app banner linking to results. Note: this is a **local** notification — there is no push channel from the server (`communication_protocol.md` §1).
 - **S13-U5** `failed` analysis → an error state **naming the stage that died**, with a retry that calls `/simulate` again and copy that says what is true: "picks up where it stopped."

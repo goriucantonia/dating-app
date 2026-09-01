@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** the stack was **run locally end to end for the first time this session, which found D-006** (browser could not reach the API), and the **answer minimum was lowered from 200 to 50 characters** (owner decision) — migration `0003`, all four code sites and every spec moved together, probe re-run GREEN at the new boundary. Step 5 remains done and witnessed. **Next: Step 6, trait extraction.**
+**Last updated:** 2026-09-01 · **Updated because:** **Step 6 (trait extraction) is built and largely witnessed** — real answers become trait rows with provenance, a no-change re-run is all-`keep` with a byte-identical `traits_hash`, a CONFIRMED trait survives an unrelated edit, and a dispute produces exactly one linked question. D-007 (profile drift on re-reads) was found by the drift alarm and closed. AC5 and the live half of AC6 are **owed** (O-5, O-6), blocked on what looks like a DAILY google free-tier cap — a quota-fit finding, not a bug. **Next: Step 7, persona snapshots.**
 
 ---
 
@@ -21,7 +21,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: Step 6 — Trait extraction** (S6-B1…B10, S6-P1/P2). Detailed below under "What is next".
+**Next: Step 7 — Persona compilation and snapshots** (S7-B1…B11, S7-P1, S7-U1…U3). Detailed below under "What is next". Step 6 is done bar two owed witnesses (O-5, O-6).
 
 ---
 
@@ -64,7 +64,8 @@ dating_app_ai\                      ← superproject
 | Step 3 reconciliation | **Witnessed** — boot 1: 35 seeded (codes logged); boot 2: no-op; deleted PQ17 restored by name on boot 3; management script `scripts/run_reconcile.py` runs the same pass | api logs |
 | Step 4 accounts | **Witnessed** — register/login/JWT/`/me`/PATCH with every A1 rule server-side (curl) and the whole flow through the Flutter UI in the browser; session restore across app restarts; dead sessions land on `/login` | This session's curl output + browser screenshots |
 | Seed fidelity | **Witnessed** — `scripts/check_question_seeds.py` GREEN: plan ↔ `seeds/questions.yaml` ↔ DB identical, 35 questions | script verdict |
-| Unit tests | **11 pass** in-container (8 guard/router + 3 traits_hash) | pytest output |
+| Step 6 extraction | **Witnessed** — traits with provenance across 5 categories; all-`keep` second run with byte-identical hash; confirmed trait survives an unrelated edit; dispute makes exactly one linked question; 30 thin answers declined. AC5/AC6 owed (O-5, O-6) | probe + curl + psql this session |
+| Unit tests | **15 pass** in-container (8 guard/router + 3 traits_hash + 4 extraction give-up) | pytest output |
 | Lint / build | **one pre-existing ruff error**: `RUF100` unused `# noqa: E402` in `migrations/env.py` — untouched by recent work, not yet fixed; image rebuilt green after D-004 editable-install fix | in-container runs |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
 
@@ -92,9 +93,37 @@ dating_app_ai\                      ← superproject
 - **S3-B7:** `app/traits_hash.py` — deterministic SHA-256 over the non-retracted trait rows (id, category, label, description, status, confidence), sorted by id. All-`keep` leaves it untouched; a retraction changes it. Unit-tested.
 - **D-004 found and closed:** the image's baked site-packages copy of `app` shadowed the bind-mounted live code for `python scripts/…` entry points. Dockerfile now uninstalls the copy and does `pip install --no-deps -e .` — one authoritative code location. Both a script and a probe re-witnessed importing live code.
 
+## What was just finished (Step 6, all backend tickets)
+
+**Server (S6-B1…B10):** `app/extraction.py` — holistic reconciliation over the FULL answer set against existing rows, per-row `keep`/`update`/`retract` verdicts plus `add`, through the Guard. `app/schemas/trait_extraction.py` + `dispute_followup.py` (both registered). `app/routers/traits.py` — `POST /profile/extract`, `GET /traits`, `POST /traits/{id}/dispute`, `POST /traits/{id}/confirm`, `GET /profile/extract/status`.
+
+**Two design choices worth not re-deciding:**
+- **The model never sees a UUID.** Trait rows are presented as handles `T1…Tn` and answers by question code (`BQ1`, `PQ07`, `D3`); the server maps back. A model asked to copy a 36-char UUID eventually copies it wrong, and a mistyped id is indistinguishable from a verdict about a *different* trait. Identity is still id-based, never wording-based (A5.1) — the handle is a stand-in for the row id, not derived from the label.
+- **Declines are stated, not inferred from silence** (S6-B9). `declined_answer_ids` is explicit, so "judged thin" is distinguishable from "the model forgot it" — which is what makes §10's counting possible.
+
+**Probe:** `probes/probe_answer_edit.py` GREEN (S6-P1/P2). **Unit tests:** `tests/test_extraction_concurrency.py` — 4 deterministic tests of the give-up (15 tests total, green).
+
+**D-007 found and closed:** the first prompt grew the profile by one re-sliced trait per run on *unchanged* answers. The S6-P2 drift alarm caught it on its first run — note that `bob` had already produced a clean all-`keep` second run, so one passing example proved nothing. See DEFECTS.
+
+**Owner decision, 2026-09-01:** the `dispute_followups` slot is **filled** — `openrouter/nvidia/nemotron-3.5-lightning:free` (the model that answered cleanly in Step 2). It is the one AI-generated question type left in the system and AC4 could not be witnessed without it. The remaining four `free-model-of-choice` slots stay deliberately unfilled.
+
+### Step 6 acceptance criteria — honest status
+
+| AC | Status |
+|---|---|
+| 1 traits with provenance across categories | **Witnessed** — 6 traits over 5 categories, every row with non-empty `source_answer_ids` + `extracted_by` |
+| 2 no-change re-run is all-`keep`, no events, hash untouched | **Witnessed** — `kept=6 … added=0`, `changed=false`, hash byte-identical, `trait_events` 6→6 |
+| 3 confirmed trait survives an unrelated edit | **Witnessed** — probe GREEN, status and provenance intact |
+| 4 dispute → exactly one linked `origin='dispute'` question | **Witnessed** — one row, `trait_id` linked, `user_id` set, trait `disputed`, event written |
+| 5 a retracted trait is PRESENT with `status='retracted'` | **OWED (O-5)** — needs a run that actually retracts; blocked on quota below |
+| 6 two rapid requests → one run + one queued follow-up | **Partly witnessed (O-6)** — give-up proven by 4 deterministic unit tests, and live logs show `extraction_queued`/`newly_queued: true` with never a second `extraction_start`. The both-halves-green live run is owed |
+| 7 thin answer → logged decline, not an invented trait | **Witnessed** — `bob`'s 30 filler pool answers all declined, zero traits invented from them |
+
+**The blocker on AC5/AC6 is a real quota finding, not a bug:** `gemini-3.6-flash` free tier returns `limit: 20` on `generate_content_free_tier_requests` and stayed exhausted across a 75-second wait and several minutes after — it behaves as a **daily** cap, not the per-minute cap assumed in Step 2. Step 6 spends one call per extraction and the probe alone spends four. **This is material to the quota-fit gate (Step 11 → 12) and should be carried into it.**
+
 ## What is next
 
-**Step 6 — Trait extraction** (S6-B1…B10, S6-P1/P2): verdict-based holistic extraction through the Guard (`keep`/`update`/`retract`/`add` per existing row, matched by id), `trait_events`, the staleness cascade in the locked order (trait write commits → `traits_hash` bumps; all-`keep` leaves everything fresh), one-run-per-user concurrency with a single queued follow-up, `GET /traits`, dispute + confirm endpoints, `probe_answer_edit.py`. Uses the `trait_extraction` route (google/gemini-3.6-flash, provisional) — real AI calls, so mind the free-tier per-minute caps and generous `max_tokens` (thinking model).
+**Step 7 — Persona compilation, snapshots, and `agent_response.v1`** (S7-B1…B11, S7-P1, S7-U1…U3): the `persona_snapshots` / `calibration_sessions` / `calibration_messages` migration, `agent_response.v1` frozen in `app/schemas/agent_response.py` (the loud stub is already there), the two-part `PersonaCompiler` (code-assembled facts + 3–5 VERBATIM answer excerpts — no model paraphrase between the user's writing and the mimicry — plus one structured digest call), immutable per-user snapshot versioning, `get_current_snapshot() is None` as a hard gate, calibration endpoints, and `probe_onboarding.py`.
 
 Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality), `carol@dating-test.dev` (no answers), plus disposable probe users.
 
@@ -108,7 +137,7 @@ Useful facts for later steps, learned witnessing Step 2:
 | Item | Blocked on | Notes |
 |---|---|---|
 | Native desktop witness (O-4) | **Owner:** enable Windows Developer Mode, then `flutter run -d windows` in `ux\` | Unchanged from last session |
-| OpenRouter `free-model-of-choice` slots | **Owner decision, deferred by design** | Probe takes a model as an argument precisely so the slots stay unfilled |
+| OpenRouter `free-model-of-choice` slots | **Owner decision, deferred by design** — EXCEPT `dispute_followups`, filled 2026-09-01 with `nvidia/nemotron-3.5-lightning:free` so Step 6 AC4 could be witnessed. Four slots remain unfilled | Probe takes a model as an argument precisely so the slots stay unfilled |
 | Paid-balance question | **Owner**, from the quota-fit numbers | Unchanged |
 | Hosting / CORS / auth posture | **Owner, explicitly deferred** | Unchanged (decision log #11) |
 
@@ -129,6 +158,7 @@ Useful facts for later steps, learned witnessing Step 2:
 10. **Calibration chat and match chat share a widget but differ** in flagging/metadata rules (§13).
 11. **Load-bearing orderings** (§19): checkpoint before advancing; counts before cascade; validate before repair; `traits_hash` only after the trait write commits.
 12. **An all-`keep` extraction run leaves everything fresh** (A5.1); **the 30-message cap counts environment rows** (§18).
+12a. **The google free tier looks like a DAILY cap, not a per-minute one** (found in Step 6). `gemini-3.6-flash` returns `limit: 20` on `generate_content_free_tier_requests` and stays exhausted for far longer than a minute — a 75-second wait did not clear it. Every extraction is one call and `probe_answer_edit.py` spends four, so a day's debugging can burn the budget before lunch. Carry this into the quota-fit gate (Step 11 → 12).
 13. **Ruff's `EXE002` is suppressed on purpose** — through the Windows bind mount every file looks executable; do not "fix" it by chmod.
 14. **Decided things stay decided** (§23).
 
@@ -140,6 +170,8 @@ Useful facts for later steps, learned witnessing Step 2:
 | O-2 | Pinned-snapshot assertion in `probe_answer_edit.py` | Step 6 | Step 9 (S9-P2) | **Anticipated** |
 | O-3 | Matching vs properly seeded demo profiles | Step 9 | Step 15 | **Anticipated** |
 | O-4 | Native (Windows) run rendering `/health` | Step 1, 2026-09-01 | Owner: Developer Mode + `flutter run -d windows` | **Owed** |
+| O-5 | A retraction observed end to end — Step 6 AC5: a trait retracted by a real run, PRESENT in the table with `status='retracted'` rather than absent. The code path and its `trait_event` are written; no run has yet chosen to retract | Step 6, **2026-09-01** | A run that retracts, once google free-tier quota allows | **Owed** |
+| O-6 | Step 6 AC6 live, both halves green — one `done` + one `queued` from two genuinely concurrent requests. The give-up itself is proven by unit tests and visible in the logs; the live run's `done` half died on google quota, not on the lock | Step 6, **2026-09-01** | A live re-run once quota allows | **Owed** |
 
 *(O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
@@ -150,11 +182,12 @@ Useful facts for later steps, learned witnessing Step 2:
 | `probe_structured_guard.py` | **GREEN** (2026-09-01, google/gemini-3.6-flash) |
 | `probe_pool_expansion.py` | **GREEN** (2026-09-01) |
 | `probe_ai_smoke.py` (helper, not in the §2 minimum set) | **GREEN** (2026-09-01; openrouter model passed as argument) |
-| All others (`answer_edit`, `onboarding`, `matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 6–15 |
+| `probe_answer_edit.py` | **GREEN** (2026-09-01, S6-P1/P2 — real AI calls) |
+| All others (`onboarding`, `matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 7–15 |
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 Trait extraction ← **next** · 6 Trait extraction · 7 Persona & snapshots · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done; O-5, O-6)** · 7 Persona & snapshots ← **next** · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 

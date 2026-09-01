@@ -1,0 +1,6 @@
+[submodule "server"]
+	path = server
+	url = https://github.com/goriucantonia/dating-app-server.git
+[submodule "ux"]
+	path = ux
+	url = https://github.com/goriucantonia/dating-app-ux.git

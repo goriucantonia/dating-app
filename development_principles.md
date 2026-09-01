@@ -67,7 +67,7 @@ Project artifacts these principles create and maintain:
 
 13. Verify the precedent before you inherit it. "We already do this elsewhere" is a claim to check — go read the elsewhere. In this codebase the likely traps: assuming the calibration chat and match chat share behavior (they share a widget by decision, but flagging and metadata rules differ), assuming all questions behave like pool questions (dispute questions are per-user, AI-generated, and outside pool progress), and assuming every long operation follows the simulation's job pattern (extraction is synchronous with a queued follow-up, chat is request–response).
 
-14. Every promise in the spec must be greppable to code. Each module plan ends with a "Locked by this document" list — that list is the audit checklist. Periodically walk each item to the code that implements it. The known accretion risks, written down so they get checked: the answer-edit staleness cascade (edit → traits → hash → embeddings → snapshot banner), the incomplete-date judging policy (≥10 messages, 0.5 weight), the no-consecutive-events rule, and the survivor-side tombstones after a deletion.
+14. Every promise in the spec must be greppable to code. Each module plan ends with a "Locked by this document" list — that list is the audit checklist. Periodically walk each item to the code that implements it. The known accretion risks, written down so they get checked: the answer-edit staleness cascade (edit → traits → hash → embeddings → snapshot banner), the incomplete-date judging policy (≥10 agent turns, 0.5 weight), the no-consecutive-events rule, and the survivor-side tombstones after a deletion.
 
 ## D. Design
 

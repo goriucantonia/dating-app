@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Steps 11 and 12 are built, both gates are CLOSED, and the owner has since revised the caps twice: ONE date per candidate, and a **16-TURN** cap that no longer counts environment rows.** A candidate now costs a floor of **18 model calls** (1 scenario + 16 turns + 1 judge) and measured **21** on a real run, the difference being the Guard repairing malformed output. A full pool is **~54 calls floor, ~63 observed, ~6 minutes**. Witnessed after the change: a date of exactly 16 turns + 3 events = 19 rows, judged and scored. Step 9's O-8 is still owed; O-13 and O-14 are deliberately deferred. Defects this session: D-010, D-011, D-012.
+**Last updated:** 2026-09-01 · **Updated because:** **the judging threshold now counts agent TURNS, not transcript rows** (owner decision) — it was the last rule still counting environment events as if someone had spoken, and the disagreement was not theoretical: a stored date with **11 rows but only 9 turns** had been judged and scored. It is now excluded and that candidate's score recomputed 93.25 → 94.25, at a cost of zero model calls. `MAX_DATES_PER_ANALYSIS` is now DERIVED from the dates-per-candidate knob, closing a trap where raising the knob would have silently left the third candidate with no dates. Steps 11 and 12 are built, both gates CLOSED. Step 9's O-8 is still owed; O-13 and O-14 are deliberately deferred.
 
 ---
 
@@ -258,6 +258,7 @@ Fixing the server half first is exactly why the symptom survived into a second a
 
 ### Things worth not re-deciding
 
+- **The judging threshold counts AGENT TURNS too** (revised 2026-09-01, owner decision). It counted transcript rows until now, which was a leftover from when the date cap did — and once the cap moved to turns the two rules disagreed about what a date is made of. The disagreement was reachable and had already happened in stored data: `7 turns + 3 events = 10 rows` was judged while `9 turns + 0 events = 9 rows` was thrown away, so the date with LESS conversation got the score. Both now read the same `turn_count`. The number stays 10 and the change RESTORES its stated meaning — "roughly five each" was always a claim about turns. Against a 16-turn cap this is a high bar (~62% of a full evening); revisit the number if genuinely half-finished dates start being discarded, not to make scores look better.
 - **The date cap is 16 AGENT TURNS, and it does NOT count environment rows** (revised 2026-09-01 by the owner, from a 30-message cap that did). The budget is written in model calls — 1 scenario + 16 turns + 1 judge — and an event costs no call, so charging events against the cap made the real spend 13–16 turns depending on dice. That is a distribution, not a budget. Events still fire and still cap at 3; a transcript is at most `TURN_CAP + MAX_EVENTS_PER_DATE` = 19 rows, and `MAX_MESSAGES_PER_DATE` is derived rather than typed. **This reverses a rule that `development_principles.md` §18 held up as a standing example**, so §18 itself was revised — and the unit test that pinned the old behaviour was INVERTED rather than deleted, because someone will eventually remember the old rule.
 - **`JUDGEABLE_MIN_MESSAGES` stayed at 10 through that change, and its meaning moved.** Against a 30-row date it was a third; against a 19-row date it is closer to two-thirds. It now excludes MORE, which is the safe direction — the failure it guards against is scoring an evening too thin to have been one. Revisit if genuinely half-finished dates start being discarded; not to make numbers look better.
 - **ONE date per candidate, revised 2026-09-01 by the owner** (was two). `DATES_PER_CANDIDATE` is now derived from the schema's `SETTINGS_PER_CANDIDATE` rather than written out separately — one generated setting IS one date, and two constants that must agree are two constants that will eventually disagree. **The cost is named:** a candidate's score used to be the mean of two independent readings, so one odd evening or one wobbly judge call got averaged down; now a single date fully determines it. Bought for roughly half the model calls.
@@ -316,7 +317,7 @@ Fixing the server half first is exactly why the symptom survived into a second a
 | 1 `probe_judge.py` green on both assertions | **Witnessed — 9/9.** Hand-recomputed score matched the stored value to the penny (90.00 vs 90.00), and **the same transcript re-judged scored identically: delta 0.00** at temperature 0.1 |
 | 2 `candidate_scores` arithmetically checkable by hand | **Witnessed on four analyses.** e.g. (94.25 + 84.00)/2 = **89.12**; (93.00 + 92.75)/2 = **92.88**. Every input is in the `candidate_scored` log line |
 | 3 an incomplete date is judged, flagged `is_partial`, weighted 0.5 | **Witnessed at 11, 19 and 20 messages.** By hand: (94.25×1 + 91.25×0.5) / 1.5 = **93.25**, exactly the stored value. A plain mean would have given 92.75 |
-| 4 an incomplete date under 10 messages is EXCLUDED; both sides of the boundary observed | **Witnessed.** `date_not_judged … messages: 6, threshold: 10` beside a 19-message date judged as partial, in the same analysis, with `dates_excluded: 1` in the candidate's score line and `excluded_from_score: true` on the wire. **How the 6-message date was made, stated plainly:** its 19-message sibling was produced by a forced fault, but no natural run landed under 10 — the timing window is a few seconds wide. So a genuine transcript was **truncated to 6 rows in the database**. The messages are real model output; the length was constructed. The rule under test (`is_judgeable`) ran on the real server path either way |
+| 4 an incomplete date under 10 TURNS is EXCLUDED; both sides of the boundary observed | **Witnessed, and re-witnessed after the 2026-09-01 turn revision.** Originally: `date_not_judged … messages: 6, threshold: 10` beside a judged 19-row partial, in the same analysis. **After the threshold moved to turns**, a stored date with 11 rows but only 9 TURNS was correctly excluded on re-run — `turns: 9, threshold: 10, counted: "agent turns, not rows"` — and its candidate's score recomputed from 93.25 to 94.25 with no model call. That is the boundary observed on real data from both sides and in both units. **How the 6-turn case was made, stated plainly:** no natural run landed under the threshold (the timing window is seconds wide), so a genuine transcript was truncated in the database. Real model output; constructed length. `is_judgeable` ran on the real server path either way |
 | 5 an empty `clashes` array is accepted as a verdict | **Witnessed repeatedly** — most judged dates returned `clashes: 0` with `clash_severity: 0`, stored as-is, never retried into producing one |
 | 6 every evaluation carries its judge model and `judge_rubric.v1` | **Witnessed** on every row and asserted by the probe |
 | 7 **one full analysis end-to-end; the quota gate closed with real numbers** | **Witnessed** — see below |
@@ -340,13 +341,29 @@ Useful facts for later steps, learned witnessing Step 2:
 - Free OpenRouter models 429 by congestion, per model. `nvidia/nemotron-3.5-lightning:free` worked; `z-ai/glm-5.2:free` was saturated (and its content includes visible reasoning text). The `free-model-of-choice` slots remain unfilled — these are probe arguments, not choices.
 - The google embedding free tier has a low per-minute cap — batch embed calls, don't loop them.
 
+### The knobs, and what moves with them
+
+Both caps are single integers and both are meant to be turned. Written down because "is this configurable or is it baked in" is the question, and the answer differs between them:
+
+| Knob | Where | What follows it automatically |
+|---|---|---|
+| **Turn cap** | `TURN_CAP = 16` in `app/simulation.py` | `MAX_MESSAGES_PER_DATE` (= `TURN_CAP + MAX_EVENTS_PER_DATE`). Nothing else reads the value. **A one-line change, genuinely.** |
+| **Dates per candidate** | `SETTINGS_PER_CANDIDATE = 1` in `app/schemas/date_scenarios.py` | `DATES_PER_CANDIDATE` and, since 2026-09-01, `MAX_DATES_PER_ANALYSIS` (= `MAX_CANDIDATES × DATES_PER_CANDIDATE`). The scenario prompt already says "produce exactly N setting(s)" with the singular handled, and `generate_scenarios` returns a list because N is a knob |
+
+**Nothing about the structure restricts it to one date.** The plural path is intact — `settings[:DATES_PER_CANDIDATE]`, ordinals from `enumerate(..., start=1)`, one `dates` row per setting.
+
+Two things do NOT follow the dates-per-candidate knob and need a human:
+
+1. **The JSON schema version.** `minItems`/`maxItems` read the constant, so changing it changes the schema — and the registry's rule is a version bump, not an edit in place. v1→v2 was that bump when it went 2→1.
+2. **The empty-intersection fallback prompt.** At two settings it read "one anchored in HER interests, one in HIS"; at one setting that is impossible, so it was rewritten to anchor the single evening on the candidate's interests. Going back to two means restoring the one-each rule — it is prose in `build_scenario_request`, not a constant, and no amount of deriving will write it for you.
+
 ## Blocked, and on whom
 
 | Item | Blocked on | Notes |
 |---|---|---|
 | Native desktop witness (O-4) | **Owner:** enable Windows Developer Mode, then `flutter run -d windows` in `ux\` | Unchanged from last session |
 | OpenRouter `free-model-of-choice` slots | **Owner decision, deferred by design** — EXCEPT `dispute_followups`, filled 2026-09-01 with `nvidia/nemotron-3.5-lightning:free` so Step 6 AC4 could be witnessed. Four slots remain unfilled | Probe takes a model as an argument precisely so the slots stay unfilled |
-| Paid-balance question | **Owner**, and the numbers are now in | **Decisive, and improved by the one-date revision.** A full analysis is now ~90 openrouter calls (was ~177). On the free tier as documented (50/day) the core loop still cannot run ONCE. 10 credits raises the allowance to 1000/day ≈ **11 analyses a day**, up from 5. See the spreadsheet below |
+| Paid-balance question | **Owner**, and the numbers are now in | **Decisive, and much improved by the two 2026-09-01 revisions.** A full analysis is now **~54 calls floor, ~63 observed** (was ~177 at two 30-message dates). On the free tier as documented (50/day) the core loop still cannot run ONCE. 10 credits raises the allowance to 1000/day ≈ **16 analyses a day**, up from 5. See the spreadsheet below |
 | Hosting / CORS / auth posture | **Owner, explicitly deferred** | Unchanged (decision log #11) |
 
 ## Traps that will bite you resuming cold
@@ -423,7 +440,7 @@ Useful facts for later steps, learned witnessing Step 2:
 | Gate | Closes in | Status |
 |---|---|---|
 | Fidelity transfer | Step 8 | **CLOSED 2026-09-01** — see the measurement below |
-| Quota fit | Step 11 → 12 | **CLOSED 2026-09-01 (S12-G1)** — one full analysis end to end, 59 calls in 7m13s with zero retries. Measurement below |
+| Quota fit | Step 11 → 12 | **CLOSED 2026-09-01 (S12-G1)** — one full analysis end to end, 59 calls in 7m13s with zero retries. That run predates the one-date and 16-turn revisions, so its *configuration* is historical; the conclusion holds a fortiori, since both revisions made the pipeline cheaper. Measurement below |
 
 ### Quota reality, measured (feeds the quota-fit gate)
 
@@ -490,7 +507,7 @@ Last session recorded "OpenRouter free models: 50 requests per DAY, account-wide
 - At **14:55 UTC** a direct one-token call returned `429 … free-models-per-day`, `X-RateLimit-Limit: 50`, `X-RateLimit-Remaining: 0`, `X-RateLimit-Reset` = 2026-09-02 00:00 UTC.
 - Between **15:12 and 15:30 UTC the same day**, on the same key and the same model, the api container made **118 successful free-model calls** with 5 rate-limited ones among them. No reset happened in between.
 
-So the cap is real and it does bite, but it is **not a simple per-calendar-day counter**, and `X-RateLimit-Reset` did not predict when service resumed. Do not plan against 50/day as a hard ceiling, and do not plan against it being absent either. What is safe to say: **free-tier throughput is unpredictable enough that a 24-minute, 171-call pipeline cannot be relied on to finish.** That is the same conclusion as the table above, reached a second way.
+So the cap is real and it does bite, but it is **not a simple per-calendar-day counter**, and `X-RateLimit-Reset` did not predict when service resumed. Do not plan against 50/day as a hard ceiling, and do not plan against it being absent either. What is safe to say: **free-tier throughput is unpredictable enough that a multi-minute, multi-call pipeline cannot be relied on to finish** — that was written of a 171-call pipeline and still holds of today's ~63. That is the same conclusion as the table above, reached a second way.
 
 ### The other cap, and what it cost today
 
@@ -521,7 +538,7 @@ The retry schedule was the reason it was fatal rather than slow: the resilience 
 
 **What the gate asked, and the answer:** *can one full pipeline complete against the real providers without exhausting a daily cap?* **Yes — and it did.** 59 calls, zero retries, zero rate-limited responses, in seven minutes.
 
-**But read the number the other way before relaxing.** 59 calls was a `partial` pool with ONE candidate, at two dates each. Even after the revision a full pool is ~90, and the documented free-model allowance is 50 a day. **This run only succeeded because the free tier is not behaving like the 50/day counter it advertises** (see the correction above) — it is not evidence that the free tier is sufficient, it is evidence that the pipeline is efficient and correct. The paid-balance decision stands exactly where the Step 11 spreadsheet left it, now with a completed run behind it rather than an estimate.
+**But read the number the other way before relaxing.** 59 calls was a `partial` pool with ONE candidate, at two dates each — the configuration of the day. A full pool under today's caps is ~54–63, and the documented free-model allowance is 50 a day. **This run only succeeded because the free tier is not behaving like the 50/day counter it advertises** (see the correction above) — it is not evidence that the free tier is sufficient, it is evidence that the pipeline is efficient and correct. The paid-balance decision stands exactly where the Step 11 spreadsheet left it, now with a completed run behind it rather than an estimate.
 
 ### Fidelity transfer gate — the measurement (S8-G1, Step 8 AC7)
 

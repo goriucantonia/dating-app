@@ -219,3 +219,22 @@ The numbered, append-only defect ledger for this project (`development_principle
   2. **Force every give-up once, on the day it is written** (§17, §7). This one was thirty seconds to force and would otherwise have shipped as "the chat says something went wrong on our side" on the first bad model day, with nothing in the log to say why.
 - **Status:** closed (ids captured before the Guard call; the forced run now returns `502 reply_failed`, the user's message is not stored, and `chat_reply_failed` logs provider, model, outcome and the error)
 - **Cross-refs:** `server/app/chat.py`, D-010, PICKUP trap 23.
+
+---
+
+## D-015 — the demo-seeding probe raced the pipeline it was testing, and the pipeline compiled a persona from nothing rather than say "not yet"
+
+- **Date:** 2026-09-01
+- **Repo:** `server`
+- **Surfaced in:** Step 15, the first runs of `probe_demo_seeding.py`. Three RED runs before the mechanism was understood, at roughly two model calls each.
+- **Mechanism:** Two defects, one hiding the other.
+  1. **The probe.** It called `run_full_pass(app)` — which launches the demo pipeline's AI half as a BACKGROUND task, the way boot does — and then ran `run_demo_pipeline()` inline "to wait for it". Two extractions for the same demo user started within milliseconds. The second hit the per-user extraction lock, and `extract_once` did what it is designed to do: returned `None` ("a run is already in flight, queued a follow-up"). The probe's SQL checks then ran before the background extraction had committed, saw zero traits, and the process exited — killing the background task mid-call. Two wasted extractions per run, and a RED that pointed at the pipeline.
+  2. **The pipeline.** `run_demo_pipeline` treated `extract_once` returning `None` as "extracted", counted it, and went on to `compile_persona` — which correctly refused with "nothing to build a persona from yet". That refusal is what showed as `failed: 1`. The pipeline had no notion of "someone else is doing this right now"; a persona built from no traits is exactly the fabrication §10 forbids, and the compiler's guard is the only reason it did not happen.
+  A third, smaller one on the same path: the success log line did `len(outcome.added)` on an integer, so the very first boot's two successful extractions were logged as failures and their compilations skipped (fixed in the same hour; the next boot picked them up, which is the "retried once per boot" rule working).
+- **Discovery method:** Adding `setup_logging()` to the probe. The first two RED runs printed only the probe's own PASS/FAIL lines because a probe process has no logging configured until it asks for it — the `demo_extracted … added: null` and `extraction_queued` lines that named the race were being written to nowhere. §5: fix the seeing first. Two runs were spent before the seeing was fixed.
+- **Lesson:** Three.
+  1. **A background task launched by the thing under test is part of the thing under test.** A probe that "waits" by running the work again is racing it. `run_full_pass` now takes `inline_demo_pipeline=True` for scripts and probes; the background mode is boot's alone.
+  2. **`None` from a lock-guarded entry point is a state, and the caller must have a word for it.** `run_demo_pipeline` now counts it as `deferred`, logs `demo_extraction_deferred`, and does not compile — the run that holds the lock will produce the traits, and the next boot will compile them.
+  3. **A probe must call `setup_logging()`.** Every probe now does. The §7 lines are the evidence; a probe that does not print them is a probe that can only say RED, not why.
+- **Status:** closed (`inline_demo_pipeline`; `deferred` path; `setup_logging()` in both new probes; the int log line. `probe_demo_seeding.py` GREEN 12/12 — wipe, rebuild through the real pipeline with provenance, and a no-op third pass)
+- **Cross-refs:** `server/app/demo.py`, `server/app/reconcile.py`, `server/probes/probe_demo_seeding.py`, D-010, D-014, PICKUP traps 25–26.

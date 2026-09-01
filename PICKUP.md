@@ -2,15 +2,15 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 4 (Accounts) is done and witnessed** — all six acceptance criteria observed over real HTTP, server and Flutter UI both. O-1 (`opt_in` behavioural difference) is now formally **Owed**. D-005 found and closed.
+**Last updated:** 2026-09-01 · **Updated because:** **Step 5 (Questions & answers) is done and witnessed** — `probe_pool_expansion.py` GREEN, and the questionnaire loop was driven live in the browser including the kill-and-reopen resume.
 
 ---
 
 ## Read this first (30 seconds)
 
-**Steps 1–4 are done and witnessed** (owed: O-4 native desktop run, O-1 opt_in behavioural difference — closes Step 9). Both API keys are in `.env` (git-ignored). The owner's standing directive (2026-09-01): the priority is API calls that **connect, route correctly, and return simple valid responses** — complex architecture, advanced prompting, and model-tier upgrades are decided later, not now.
+**Steps 1–5 are done and witnessed** (owed: O-4 native desktop run, O-1 opt_in behavioural difference — closes Step 9). Both API keys are in `.env` (git-ignored). The owner's standing directive (2026-09-01): the priority is API calls that **connect, route correctly, and return simple valid responses** — complex architecture, advanced prompting, and model-tier upgrades are decided later, not now.
 
-**Step 4, witnessed today (server via curl over the published port, UI in the browser):** register → auto-login → `/me` end-to-end from the 3-step Flutter form ("Signed in as Bob" rendering the live payload); login as an existing user; wrong password shows the envelope message verbatim; duplicate email → 409 `email_taken`, rendered verbatim in the register form; age-17 → 422 with field-level detail (and the date picker cannot even select an under-18 date); page reload restores the session from storage without re-login; corrupted stored session lands cleanly on `/login`; tampered/missing token → 401 envelope; `PATCH /me` flipped `opt_in` and psql showed `t`; cross-field PATCH validation (max below stored min) → 422.
+**Step 5, witnessed today:** `probe_pool_expansion.py` GREEN over real HTTP (two probe users: one for 199-char rejection / mid-batch abandon-and-resume / baseline-excluded-from-pool-progress / edit-bumps-updated_at; one straight run proving exactly 6 batches of 5 in `pool_order` with batch 7 the EXACT `pool_exhausted` payload). In the browser: the onboarding guard forced `/onboarding/questions` on a fresh signed-in user; the interstitial shows the locked copy; BQ1 answered with the live counter flipping at 200; **the AC1 kill-and-reopen landed on "3 of 5" with BQ1–BQ2 preserved**; finishing baseline lifted the guard to home; `/profile/expand` showed pool progress, served PQ01 through the SAME widget, rendered the exhausted achievement card verbatim, and opened the prefilled single-answer editor.
 
 **Standing model facts** (Step 2, unchanged): embeddings pinned to `gemini-embedding-001` at 768 dims (dated revision — Google withdrew `text-embedding-004`); provisional google chat model `gemini-3.6-flash`; OpenRouter slots deliberately unfilled.
 
@@ -61,7 +61,15 @@ dating_app_ai\                      ← superproject
 | Lint / build | ruff clean; image rebuilt green after D-004 editable-install fix | in-container runs |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
 
-## What was just finished (Step 4, all tickets)
+## What was just finished (Step 5, all tickets)
+
+- **Server (S5-B1…B6):** `app/routers/questions.py` — `GET /questions` (baseline + pool + own dispute questions, answered state + answer text; drives resume AND the edit view), `GET /questions/next-batch` (5 unanswered pool by `pool_order`; the answer set IS the cursor; `pool_exhausted` as a normal 200 payload), `PUT /answers/{question_id}` (ONE upsert path; 200-char minimum enforced via pydantic for baseline/pool/dispute alike; edit logging with old/new length + traits sourced from the edited answer — empty until Step 6 but logged from day one). Dispute questions excluded from `answered_pool` by the join on `origin='pool'`.
+- **Fix along the way:** models switched from generic `sqlalchemy.ARRAY` to the postgresql dialect ARRAY — `.contains()` (the edit-log trait lookup) only exists on the dialect type. Found by the probe's 500.
+- **UX (S5-U1…U8):** `features/questions/` — freezed models, repository, `questionsProvider` (rebuilds on login/logout), and **AnswerFlow**: THE one-question-per-page widget (progress label, 8–16-line field, counter muted→confirmed at 200, A2 voice nudge, autosave on advance + 2s idle debounce once valid, every failure visibly surfaced per D-005). Onboarding screen (interstitial with the locked copy → flow → guard lifts via provider invalidation); `/profile/expand` (pool progress, batch CTA, exhausted achievement card, answers list with "Editing changes your future matches, not past results." and the prefilled single-answer editor — all the SAME AnswerFlow). Router guard 2 added to the one redirect: `baselineIncomplete == null` means "not known yet — never bounce on a guess".
+- **Probe:** `probes/probe_pool_expansion.py` GREEN (S5-P1).
+- **Noted for Step 10:** the flutter dev web server drops deep-link paths (`/profile/expand` typed into the address bar lands on `/`); deep links are a Step 10 AC and will need the path-URL strategy checked then.
+
+## What was finished earlier today (Step 4, all tickets)
 
 - **Server (S4-B1…B5):** `app/routers/auth.py` (register with the exact A1 form — every rule a pydantic validator so violations arrive as field-level 422s; login; both return `{token, user}`; one message for unknown email and wrong password), `app/routers/me.py` (GET/PATCH `/me`, cross-field age-range check against stored values, `opt_in_changed` log line per §8), `app/security.py` (bcrypt; HS256 JWT, 7-day lifetime — named alongside the no-refresh-tokens trade; the one bearer dependency), `app/users.py` (gender values, `compute_age` — age computed, never stored — and the `UserOut` payload in one place). `email-validator` added to deps (it rejects special-use TLDs like `.local` — use real-shaped domains in tests). `DELETE /me` deliberately absent until Step 15 (S4-B6).
 - **UX (S4-U1…U7):** freezed `User` model + `AuthRepository`; resilient `TokenStore` over flutter_secure_storage; the ONE dio interceptor (bearer on request, 401 → `sessionExpired`) in `api_client.dart`; `AuthController` (`AsyncNotifier<User?>`, restores session in `build()`); go_router guard in one place (`routerProvider`); `/login`; `/register` as the three-step Stepper (date picker hard-capped at 18+, opt-in switch default off with its one-line description); placeholder home rendering live `/me`; the Step 1 debug health screen deleted.
@@ -79,7 +87,9 @@ dating_app_ai\                      ← superproject
 
 ## What is next
 
-**Step 5 — Questions and answers** (S5-B1…B6, S5-U1…U8, S5-P1). The questionnaire loop: `GET /questions`, `GET /questions/next-batch` (batches of 5 by `pool_order`, the answer set IS the cursor), `PUT /answers/{question_id}` (one upsert for first write and edit; 200-char minimum applies to baseline, pool, AND dispute — §18), `pool_exhausted` as a normal payload; one-per-page UI with autosave (advance + 2s debounce), the baseline-incomplete guard added to the ONE router redirect, `/profile/expand` reusing the same widget; `probe_pool_expansion.py`.
+**Step 6 — Trait extraction** (S6-B1…B10, S6-P1/P2): verdict-based holistic extraction through the Guard (`keep`/`update`/`retract`/`add` per existing row, matched by id), `trait_events`, the staleness cascade in the locked order (trait write commits → `traits_hash` bumps; all-`keep` leaves everything fresh), one-run-per-user concurrency with a single queued follow-up, `GET /traits`, dispute + confirm endpoints, `probe_answer_edit.py`. Uses the `trait_extraction` route (google/gemini-3.6-flash, provisional) — real AI calls, so mind the free-tier per-minute caps and generous `max_tokens` (thinking model).
+
+Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality), `carol@dating-test.dev` (no answers), plus disposable probe users.
 
 Useful facts for later steps, learned witnessing Step 2:
 - `gemini-3.6-flash` is a **thinking model** — a tight `max_tokens` gets eaten by reasoning and yields `MAX_TOKENS` with no text. Give generous budgets.
@@ -128,12 +138,13 @@ Useful facts for later steps, learned witnessing Step 2:
 | Probe | Status |
 |---|---|
 | `probe_structured_guard.py` | **GREEN** (2026-09-01, google/gemini-3.6-flash) |
+| `probe_pool_expansion.py` | **GREEN** (2026-09-01) |
 | `probe_ai_smoke.py` (helper, not in the §2 minimum set) | **GREEN** (2026-09-01; openrouter model passed as argument) |
-| All others (`pool_expansion`, `answer_edit`, `onboarding`, `matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 5–15 |
+| All others (`answer_edit`, `onboarding`, `matching_filters`, `simulation_resume`, `judge`, `deletion`, `demo_seeding`) | Not written — delivered in Steps 6–15 |
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 Questions & answers ← **next** · 6 Trait extraction · 7 Persona & snapshots · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 Trait extraction ← **next** · 6 Trait extraction · 7 Persona & snapshots · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 

@@ -16,13 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql-clie
 WORKDIR /app
 
 # Resolve the dependency set first so source edits don't re-resolve (and so a
-# broken resolve fails loudly at build time — S1-B9).
+# broken resolve fails loudly at build time — S1-B9). The package COPY itself
+# is uninstalled again: a baked site-packages copy of `app` silently shadows
+# the bind-mounted live code for scripts (DEFECTS.md D-004).
 COPY pyproject.toml ./
-RUN pip install .
+RUN pip install . && pip uninstall -y dating-app-server
 
 # The dev workflow bind-mounts ./server over /app; this COPY makes the image
-# self-sufficient when run without the mount.
+# self-sufficient when run without the mount. The editable install makes /app
+# the ONE authoritative code location on sys.path, mounted or not.
 COPY . .
+RUN pip install --no-deps -e .
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

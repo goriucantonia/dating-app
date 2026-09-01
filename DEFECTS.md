@@ -70,3 +70,13 @@ The numbered, append-only defect ledger for this project (`development_principle
 - **Lesson:** Never let a build tool *infer* structure that the specs define explicitly; the inference is re-run on every future tree shape, including ones that don't exist yet. Declare it: `[tool.setuptools.packages.find] include = ["app*"]`. The general form: a configuration that works by default is only proven for the tree it was tested on — pin what must stay true.
 - **Status:** closed (explicit package declaration; full `docker compose build` re-verified green the same day)
 - **Cross-refs:** `IMPLEMENTATION_PLAN.md` S1-B9; `server/pyproject.toml`.
+
+## D-004 — a baked site-packages copy of `app` silently shadowed the bind-mounted live code
+
+- **Date:** 2026-09-01
+- **Repo:** `dating_app_ai` (the Dockerfile), surfaced in `server` scripts
+- **Mechanism:** The Dockerfile's `pip install .` put a frozen copy of the `app` package into site-packages at build time. The dev workflow bind-mounts `./server` over `/app`, and uvicorn (run from `/app`) resolved the live code — but any script run as `python scripts/x.py` gets `scripts/` as `sys.path[0]`, falls through to site-packages, and imports the **stale snapshot**. It surfaced as a loud `ModuleNotFoundError` for the just-added `app.reconcile` — the lucky case. The unlucky case it implied: a probe importing a stale-but-importable `app` would have run *yesterday's code* and printed a verdict about it, silently.
+- **Discovery method:** Live run of `scripts/run_reconcile.py` inside the container (Step 3, S3-B6).
+- **Lesson:** In a bind-mount dev workflow there must be exactly ONE authoritative code location on `sys.path`. The fix: install dependencies from the lockstep layer but `pip uninstall` the package copy, then `pip install --no-deps -e .` after COPY — the editable install points at `/app`, so image-only and bind-mounted runs both resolve the same, current code. The general form: "it worked for the app entry point" says nothing about the other entry points; each way code gets executed (server, scripts, probes) resolves imports its own way and each needs the witness.
+- **Status:** closed (Dockerfile editable-install fix; rebuilt, and both a script and a probe re-witnessed importing live code, 2026-09-01)
+- **Cross-refs:** `Dockerfile`; `IMPLEMENTATION_PLAN.md` S1-D2, S3-B6; D-003 (the same file's previous packaging trap).

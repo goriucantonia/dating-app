@@ -2,15 +2,17 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** Step 2 (AI Interaction Module) is **built** — every file `ai_interaction.md` §1 names, plus probe, tests, and startup wiring — but its live-call acceptance criteria are **not witnessed**: both API keys are still empty in `.env`.
+**Last updated:** 2026-09-01 · **Updated because:** Step 3 (core schema + startup reconciliation) is **done and witnessed** — all six acceptance criteria observed on the running stack. Step 2 remains built-not-witnessed (API keys still empty). All three repos pushed to their GitHub remotes.
 
 ---
 
 ## Read this first (30 seconds)
 
-**Step 1 is done and witnessed** (one owed native-run witness, O-4). **Step 2 is built, not yet witnessed** — the honest words per §6. The whole `app/ai/` layer exists, hot-loads on the running stack, passes 8 unit tests and ruff, and its two *refusal* paths (missing key → typed `AIError`; unfilled model slot → typed `RouteUnresolvedError`) **were** witnessed on the real deployment. What was NOT witnessed: any real model call. `probe_structured_guard.py` and `probe_ai_smoke.py` are written and waiting.
+**Steps 1 and 3 are done and witnessed** (owed items O-4, and O-5 for Step 2). **Step 2 is built, not yet witnessed** — its live-call ACs need `GOOGLE_AI_API_KEY` and `OPENROUTER_API_KEY` in `.env`, both still empty. Its refusal paths, startup validation, unit tests, and grep proofs ARE witnessed.
 
-**To unblock Step 2's witnesses: put `GOOGLE_AI_API_KEY` and `OPENROUTER_API_KEY` into `.env`**, then run the two probes (commands below). Until then, do not start Step 3 work *claiming* Step 2 is done — Step 3 is schema-only and independent (the plan allows 2 ∥ 3), so building Step 3 next is legitimate; closing Step 2 is not.
+**Step 3, witnessed today:** migration `0002` created the six Module 1 tables verbatim (traits before questions — the forward-reference trap); first boot seeded exactly 35 questions and logged every code; second boot logged a no-op; a deleted pool row (PQ17) was restored by name on reboot; all five CHECK constraints rejected their bad inserts; pgvector accepted 768 dims and rejected 3; and `scripts/check_question_seeds.py` proved module plan ↔ seeds fixture ↔ database are character-for-character identical.
+
+**Next: Step 4 — Accounts** (registration, login, `/me`). Also: witness Step 2 the moment keys land (see "What is next").
 
 ---
 
@@ -26,14 +28,17 @@ dating_app_ai\                      ← superproject
 │   ├── pyproject.toml (explicit package decl — D-003), alembic.ini, .gitignore
 │   ├── app\
 │   │   ├── main.py · config.py · db.py · errors.py · logging_setup.py
+│   │   ├── models.py · reconcile.py · traits_hash.py            (Step 3)
 │   │   ├── ai\      base.py · google.py · openrouter.py · registry.py
 │   │   │            routing.py · structured.py · resilience.py   (all 8 of §1's files exist)
 │   │   └── schemas\ __init__.py (registry) · agent_response.py (loud stub, Step 7)
 │   ├── config\ai.yaml              (google slots: gemini-2.5-flash PROVISIONAL;
 │   │                                openrouter slots: unfilled by design)
-│   ├── migrations\  versions\0001_pgvector_extension.py
+│   ├── migrations\  versions\0001_pgvector_extension.py · 0002_module1_core_tables.py
+│   ├── seeds\       questions.yaml (GENERATED verbatim — regen with the checker's --write)
+│   ├── scripts\     check_question_seeds.py · run_reconcile.py
 │   ├── probes\      probe_structured_guard.py (S2-P1) · probe_ai_smoke.py (AC helper)
-│   ├── tests\       test_structured_guard.py (8 tests, green)
+│   ├── tests\       test_structured_guard.py · test_traits_hash.py (11 tests, green)
 │   └── the seven server module plans
 └── ux\                             ← submodule
     ├── Flutter 3.47.2 app (lib\app, lib\core\api, lib\features\debug) + widget test
@@ -44,32 +49,32 @@ dating_app_ai\                      ← superproject
 
 | Area | State | Evidence |
 |---|---|---|
-| Step 1 stack | **Witnessed** (2026-09-01): cold up → DB-connected 200; second down/up; topology; envelope; failure path | Prior session, recorded in git history |
-| Step 2 `app/ai/` layer | **Built, not yet witnessed** — all files of `ai_interaction.md` §1; hot-loaded by the running api; startup validation green | Container logs: `provider_built` ×2, `router_ready` |
-| Step 2 refusal paths | **Witnessed** — missing key → typed `AIError`; unresolved slot → `RouteUnresolvedError`, both on the real deployment | In-container run, 2026-09-01 |
-| Step 2 unit tests | **8 pass** in-container (Guard: first-try / fences / repair-carries-error / 3-attempt give-up with raw output; Router: startup rejects unknown provider & missing task, unresolved→typed error, resolve) | pytest output |
-| Step 2 live-call ACs (AC1, AC2, AC3, AC4, AC6) | **NOT witnessed — blocked on API keys** | `.env` keys empty |
-| AC5 grep proof | **Witnessed**: concrete providers imported only by `app/ai/registry.py`; model-JSON parsed only in `structured.py` | grep output this session |
-| Lint | ruff clean (`EXE002` ignored — bind-mount artifact) | in-container run |
-| Image build | Re-verified green after the D-003 packaging fix | build log |
-| Probes | `probe_structured_guard.py` **written, never run green**. `probe_ai_smoke.py` (helper) same | Directory listing |
+| Step 1 stack | **Witnessed** (2026-09-01): cold up → DB-connected 200; second down/up; topology; envelope; failure path | Prior session, git history |
+| Step 2 `app/ai/` layer | **Built, not yet witnessed** — refusal paths, startup validation, 8 unit tests, AC5 greps ARE witnessed; live-call ACs blocked on keys (O-5) | Container logs, pytest, grep |
+| Step 3 schema | **Witnessed** — migration `0002`: users, traits, questions, answers, trait_events, profile_embeddings (two-vector form), all CHECKs proven by rejected inserts, vector(768) dimension enforced | This session's psql output |
+| Step 3 reconciliation | **Witnessed** — boot 1: 35 seeded (codes logged); boot 2: no-op; deleted PQ17 restored by name on boot 3; management script `scripts/run_reconcile.py` runs the same pass | api logs |
+| Seed fidelity | **Witnessed** — `scripts/check_question_seeds.py` GREEN: plan ↔ `seeds/questions.yaml` ↔ DB identical, 35 questions | script verdict |
+| Unit tests | **11 pass** in-container (8 guard/router + 3 traits_hash) | pytest output |
+| Lint / build | ruff clean; image rebuilt green after D-004 editable-install fix | in-container runs |
+| Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
 
-## What was just finished
+## What was just finished (Step 3, all tickets)
 
-- **S2-B1…B9 all built.** `base.py` (protocol, `GenRequest`/`GenResult`/`VersionedSchema`, `TaskName` ×8, `CallOutcome` ×5, typed error hierarchy incl. `StructuredOutputError.raw_output`); `google.py` (google-genai, native `response_json_schema`, embeddings, safety→`RefusedError`, 429→`RateLimitedError`); `openrouter.py` (httpx, native `json_schema` with remembered per-model fallback to prompt-embedded, upstream-error tunneling handled, `embed` = typed error since embeddings are pinned to google); `registry.py` (the only instantiation point; boots without keys, logging loudly); `routing.py` (startup-fails on incoherent config; unfilled slot → typed error, never a guess); `structured.py` (the one Guard: validate→repair→3 attempts→typed give-up, fence stripping, prompt-embedded fallback); `resilience.py` (backoff, per-provider `RateLimiter`, `MAX_ATTEMPTS=3`, the mandatory `ai_call` line + `ai_call_retry` detail lines); `app/schemas/` registry + a **loud** `agent_response.py` stub (D-001: an absent file hides better than a stubbed one).
-- **Wiring:** lifespan builds providers + `TaskRouter` at startup — config incoherence kills boot, per S2-B5.
-- **Provisional model choice recorded:** google routes set to `gemini-2.5-flash` (the spec's `gemini-flash` is not a callable id). Provisional per the plan's own terms; final choice belongs to the gates. OpenRouter slots untouched.
-- **D-003 found and closed** (see `DEFECTS.md`): setuptools auto-discovery broke the build the moment `probes/`/`tests/` gained `.py` files; explicit `include = ["app*"]` now pinned; full image rebuild re-verified.
-- Logging decision worth knowing: `execute()` emits ONE `ai_call` line per provider call with the final outcome (`ok`/`rate_limited`/`refused`/`gave_up`) plus `ai_call_retry` lines per intermediate failure; the Guard adds `ai_call` lines with `malformed`/`gave_up` after validation. All five §5 outcomes have exactly one home.
+- **S3-B1/B2:** migration `0002` — the A3 DDL verbatim, with `traits` created before `questions` (the document's forward reference is a spec, not an execution order) and one `op.execute` per statement (asyncpg cannot prepare multi-command SQL). `profile_embeddings` is the revised two-vector form only.
+- **S3-B3:** `app/models.py` — six async models mirroring the DDL one-to-one, Text + CHECK (named trade), pgvector `Vector(768)`. Alembic `env.py` now targets `Base.metadata`.
+- **S3-B4:** `seeds/questions.yaml` **generated verbatim** from the module plan by `scripts/check_question_seeds.py --write` (no hand transcription — that is how a curly apostrophe silently becomes straight). Checker mode is the AC6 witness. Baseline probe_area mapping recorded in the script: BQ1=interests, BQ2=partner_criteria, BQ3/BQ4=situational, BQ5=self_image (routine call, §25 — BQ4's primary framing is situational; the pool carries six dedicated conversational questions).
+- **S3-B5/B6:** `app/reconcile.py` — step 1 of the four-step pass (insert missing / repair drifted fields with a per-field log / count correct), wired into lifespan and invocable via `scripts/run_reconcile.py`.
+- **S3-B7:** `app/traits_hash.py` — deterministic SHA-256 over the non-retracted trait rows (id, category, label, description, status, confidence), sorted by id. All-`keep` leaves it untouched; a retraction changes it. Unit-tested.
+- **D-004 found and closed:** the image's baked site-packages copy of `app` shadowed the bind-mounted live code for `python scripts/…` entry points. Dockerfile now uninstalls the copy and does `pip install --no-deps -e .` — one authoritative code location. Both a script and a probe re-witnessed importing live code.
 
 ## What is next
 
-1. **Witness Step 2** the moment keys land in `.env` (docker compose restart api first, so the env reaches the container):
-   - `docker compose exec api python probes/probe_structured_guard.py` → must print GREEN (3 malformed, 1 gave_up, no silent default).
-   - `docker compose exec api python probes/probe_ai_smoke.py <free-openrouter-model>` → both providers answer, embedding is 768-dim. The OpenRouter model argument is *for the probe only* — do not fill the routing slots for it.
-   - AC4: change `trait_extraction`'s model in `config/ai.yaml`, restart, watch the log line name the new model, change it back.
-   - AC6 (a real 429 retried with backoff → typed error) may occur naturally under free-tier quotas during the smoke run; if not seen, record it as an owed measurement.
-2. **Step 3 — Core schema and startup reconciliation** (S3-B1…B7). Independent of Step 2's witnesses; may start immediately. Mind traps 5 and 6 below.
+1. **Step 4 — Accounts** (S4-B1…B5, S4-U1…U7): registration with the exact A1 form, login → JWT, `GET`/`PATCH /me`, the Flutter auth screens + the single 401 interceptor + router guards. `DELETE /me` is deliberately Step 15.
+2. **Witness Step 2** the moment keys land in `.env` (restart api first — compose reads `.env` at container start):
+   - `docker compose exec api python probes/probe_structured_guard.py` → GREEN (3 malformed, 1 gave_up, no silent default).
+   - `docker compose exec api python probes/probe_ai_smoke.py <free-openrouter-model>` → both providers answer, embedding 768-dim. The model argument is probe-only — do not fill the routing slots for it.
+   - AC4: flip `trait_extraction`'s model in `config/ai.yaml`, restart, watch the log line change, flip back.
+   - AC6: a real 429 retried with backoff → typed error; if free-tier quotas don't produce one naturally, it stays in O-5.
 
 ## Blocked, and on whom
 
@@ -118,7 +123,7 @@ dating_app_ai\                      ← superproject
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 AI Interaction **(built; O-5 — witnesses blocked on keys)** · 3 Schema + reconciliation ← **next buildable** · 4 Accounts · 5 Questions & answers · 6 Trait extraction · 7 Persona & snapshots · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 AI Interaction **(built; O-5 — witnesses blocked on keys)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 Accounts ← **next** · 5 Questions & answers · 6 Trait extraction · 7 Persona & snapshots · 8 UX profile + **fidelity gate** · 9 Matching · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 
@@ -130,4 +135,4 @@ dating_app_ai\                      ← superproject
 ## Where the decisions live
 
 - **What:** `user_perspective.md` → `project_description.md` → module plans. **How:** `development_principles.md`.
-- **Wire:** `communication_protocol.md`. **Order:** `IMPLEMENTATION_PLAN.md`. **What went wrong:** `DEFECTS.md` (D-001…D-003).
+- **Wire:** `communication_protocol.md`. **Order:** `IMPLEMENTATION_PLAN.md`. **What went wrong:** `DEFECTS.md` (D-001…D-004).

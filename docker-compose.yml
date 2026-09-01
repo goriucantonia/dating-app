@@ -1,0 +1,49 @@
+# Docker Compose — superproject root (owner decision, 2026-09-01: the superproject is
+# the only repo that can describe a deployment spanning both submodules).
+# Orchestrates the backend only: `api` + `db`. The Flutter app is NOT containerized
+# this phase (named trade, communication_protocol.md §2) — it runs on the host and
+# talks to the api container at http://localhost:8000.
+#
+# `db` lives on the compose-internal network only — never a published port to the
+# host. The client must be unable to reach Postgres by topology, not by convention
+# (communication_protocol.md §2).
+
+services:
+  api:
+    build:
+      context: ./server
+      dockerfile: ../Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Inside the compose network the DB host is the service name, always.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dating}:${POSTGRES_PASSWORD:?set in .env}@db:5432/${POSTGRES_DB:-dating_app}
+    volumes:
+      # Dev bind mount: a reload is a save, not a rebuild (S1-D2).
+      - ./server:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dating}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-dating_app}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dating} -d ${POSTGRES_DB:-dating_app}"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    # No `ports:` — deliberate. See header comment.
+
+volumes:
+  db_data:

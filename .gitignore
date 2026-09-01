@@ -1,0 +1,12 @@
+# Superproject root ignores (S1-D6).
+# NOTE: a submodule's .gitignore does not cover this root, and this file does not
+# reach inside `server/` or `ux/` — each repo carries its own.
+
+# Secrets — .env lives at the root next to Compose; this line is what keeps it
+# out of history.
+.env
+
+# OS noise
+Thumbs.db
+Desktop.ini
+.DS_Store

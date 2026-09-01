@@ -80,3 +80,14 @@ The numbered, append-only defect ledger for this project (`development_principle
 - **Lesson:** In a bind-mount dev workflow there must be exactly ONE authoritative code location on `sys.path`. The fix: install dependencies from the lockstep layer but `pip uninstall` the package copy, then `pip install --no-deps -e .` after COPY — the editable install points at `/app`, so image-only and bind-mounted runs both resolve the same, current code. The general form: "it worked for the app entry point" says nothing about the other entry points; each way code gets executed (server, scripts, probes) resolves imports its own way and each needs the witness.
 - **Status:** closed (Dockerfile editable-install fix; rebuilt, and both a script and a probe re-witnessed importing live code, 2026-09-01)
 - **Cross-refs:** `Dockerfile`; `IMPLEMENTATION_PLAN.md` S1-D2, S3-B6; D-003 (the same file's previous packaging trap).
+
+## D-005 — a registration that succeeded server-side showed the user nothing at all
+
+- **Date:** 2026-09-01
+- **Repo:** `ux`
+- **Surfaced in:** The Step 4 register-through-the-UI witness.
+- **Mechanism:** The submit handlers caught only `ApiException` (the server's envelope). During the witness, the token save threw a *platform* exception instead (`DataError: AES key data must be 128 or 256 bits` — the browser test had corrupted flutter_secure_storage's own AES key entry). The throw happened AFTER the server had created the account, and nothing caught it: no error text, no navigation, no state change. The user's tap did nothing visible while the account silently came into existence — the second tap then honestly reported "already registered", which is how it was noticed. `TokenStore` had the same fragility on load/save/clear: any storage failure would propagate raw.
+- **Discovery method:** Live UI run in the browser, plus the uncaught-promise error in the browser console. The storage corruption itself was self-inflicted by the tamper test — but the silent-catch structure would have swallowed ANY non-API failure (blocked browser storage, missing platform keystore) the same way.
+- **Lesson:** The failure branch you *typed* is the only failure branch you handle. A submit path needs a catch for "everything else" that still puts words on the screen — an invisible failure after a server-side success is the worst failure mode a form can have. Structurally: every user-triggered async action ends in exactly three visible outcomes (success navigation, envelope message, generic device-error message), and storage wrappers degrade to in-memory rather than throwing into UI code.
+- **Status:** closed (catch-alls in login/register submit + resilient TokenStore; register re-witnessed green end-to-end, 2026-09-01)
+- **Cross-refs:** `ux/lib/core/auth/token_store.dart`, `ux/lib/features/auth/*_screen.dart`; ux_architecture.md §1.5 (the four-state rule this violated in spirit).

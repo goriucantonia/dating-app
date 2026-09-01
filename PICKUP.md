@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 8 is built and the FIDELITY TRANSFER GATE IS CLOSED** — measured, not impressionistic: 6 persona replies through the real date-simulation model, 1 clear "I'd never say that" (an invented cooking anecdote) plus 1 borderline. The profile screen, the shared chat widget, calibration and settings all render and work in the browser. Owner decision: extraction quality is a known concern deferred to a later model upgrade — do NOT keep re-raising it. **Next: Step 9, candidate matching.**
+**Last updated:** 2026-09-01 · **Updated because:** **Step 9 is code-complete but its end-to-end witness is OWED (O-8)** — the OpenRouter free tier is **50 requests/day account-wide** and was exhausted; that number is now measured and feeds the quota-fit gate. D-009 recorded: a prompt fix of mine taught the model to write identifiers into trait `label`, and a conditional probe assertion passed vacuously over it. O-1 and O-2 are closed. **Next: one clean probe run after 2026-09-02 00:00 UTC, then Step 10.**
 
 ---
 
@@ -32,7 +32,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: Step 9 — candidate matching.** Steps 1–8 are all done and witnessed; the fidelity gate is closed with its measurement recorded below.
+**Next: finish Step 9's owed witness (O-8) after the quota resets, then Step 10.** Steps 1–8 are done and witnessed; Step 9 is code-complete. The fidelity gate is closed with its measurement recorded below.
 
 ---
 
@@ -185,9 +185,37 @@ dating_app_ai\                      ← superproject
 
 **Note on the web witness:** the flutter DEV server's dwds debug socket failed repeatedly this session even on `127.0.0.1` (the D-006 workaround). The witness was taken against a **release build served statically** (`flutter build web` + `python -m http.server`), which has no debug socket at all. That is now the reliable way to witness UI — see trap 3d.
 
+## What was just finished (Step 9 — code complete, end-to-end witness OWED)
+
+**Server (S9-B1…B11):** migration `0005` (`analyses` with `progress` JSONB reserved for Step 11, `analysis_candidates`); `app/matching.py` — deterministic embedding serialisation, staleness re-embed, the five-condition hard filter in pure SQL, the two-vector mutual score, code-computed reasons, honest pool handling, and the per-step funnel log; `app/routers/analyses.py` — `POST /analyses` (202, background), `GET /analyses/{id}`, `GET /analyses`, and the 409 that is **state, not failure**.
+
+**Probes:** `probes/probe_matching_filters.py` written (S9-P1). **S9-P2 done** — the pinned-snapshot assertion is ENABLED in `probe_answer_edit.py`, closing O-2.
+
+**Unit tests: 29 pass** (14 new in `tests/test_matching_math.py`), pinning the deterministic guarantees — byte-stable serialisation, retracted rows never embedded, `shared_interests` finding a real overlap, ignoring filler words, and never treating a *preference* mentioning bicycles as a shared interest.
+
+**Things worth not re-deciding:**
+- **The funnel counts are a SEPARATE query from the row query.** Folded together they vanish exactly when the pool is empty — which is the one time they are the whole point (AC3).
+- **`shared_interests` intersects LABELS**, so a corrupted label silently disables matching without failing anything. That is not hypothetical — see D-009.
+- **Reasons are computed in code and there is no AI call anywhere in `matching.py`.** That is the point of the module (trade #3).
+
+### Step 9 status — honest
+
+| AC | Status |
+|---|---|
+| 1 probe green over all five exclusions, `partial`, `no_candidates` | **NOT witnessed on clean data — OWED (O-8)** |
+| 2 per-step pool counts logged on every run | Code in place; observed in logs on the polluted run |
+| 3 `no_candidates` names the emptying filter | Code in place; not yet observed on clean data |
+| 4 `opt_in` both directions (closes O-1) | **Observed both ways** on the polluted run — but that run also matched a stale candidate, so it is re-owed under O-8 |
+| 5 no-snapshot user never a candidate | Observed on the polluted run |
+| 6 `shared_interests` verifiable by hand | **Unit-tested**; end-to-end owed |
+| 7 second POST → 409 state | Observed on the polluted run |
+| 8 `compatibility` = mean of the two fits | **Unit-tested**; also recomputed exactly on the polluted run |
+
+**Why nothing above is claimed as done:** the one GREEN run this session was polluted — concurrent probe runs shared an output file and stale probe users stayed in the pool, so the requester matched a PREVIOUS run's candidate and `shared_interests` was vacuous because of D-009. Every re-run since has been blocked by the OpenRouter daily cap. **The code is complete and lint/unit-test clean; the end-to-end witness needs one clean run once quota resets.**
+
 ## What is next
 
-**Step 9 — Candidate matching: embeddings, hard filters, and the analysis object.** Note two things waiting for it: **O-1** (`opt_in` observed changing pool membership) closes in Step 9 AC4, and **O-2** (the pinned-snapshot assertion in `probe_answer_edit.py`) closes in S9-P2. Step 9 also re-embeds every user through `google/gemini-embedding-001`, which is the one route still on google — expect trap 12a's daily cap.
+**Finish Step 9's witness first** (O-8): after 2026-09-02 00:00 UTC, from a clean pool, `docker compose exec api python probes/probe_matching_filters.py` — ONE run, no file edits while it runs. Then **Step 10 — UX dashboard and the matches reveal**.
 
 Test accounts on the current volume (password `hunter2222`): `ana@dating-test.dev` (no answers), `bob@dating-test.dev` (all 35 answered — BQ1–BQ5 written in a real voice, pool answers are filler text: fine for pipeline tests, poor for judging extraction quality), `carol@dating-test.dev` (no answers), plus disposable probe users.
 
@@ -214,6 +242,7 @@ Useful facts for later steps, learned witnessing Step 2:
 3b. **A Dart edit needs the dev server restarted** — a browser reload alone serves the stale bundle (this is how a `_minChars` change appeared not to apply). First compile is ~60–90s and the page is blank until it finishes; that blankness is normal, not a failure.
 3c. **Probes cannot see browser-only failures** (D-006). Every probe runs inside the api container, where there is no Origin header and no preflight. CORS, mixed content, cookies, websocket upgrades: the probe suite is GREEN straight through all of them. Reaching the API *from the browser* is its own witness step.
 3d. **When dwds will not co-operate, witness against a RELEASE BUILD, not the dev server.** `flutter build web` then `python -m http.server 5000 --bind 127.0.0.1` from `ux/build/web`. No debug websocket exists, so the whole dwds failure class disappears; it loads in about a second instead of ninety, and it is what the user would actually run. Cost: no hot reload, and you must rebuild after each Dart change. This is how Step 8 was witnessed after the dev server refused to boot the app repeatedly.
+3e. **Do not edit files under `server/` while a probe is running.** uvicorn runs with `--reload`; a save restarts the API and kills every in-flight request the probe is waiting on. A long matching probe was lost to this. Either wait for the probe to settle, or make the edit and accept re-running it.
 4. **`.env` holds the DB password the volume was initialized with** — regenerate both together or neither.
 5. **The `questions` table has a forward reference** (`module_1_data_collection.md` A3): create `traits` before `questions`, or add the FK after both exist.
 6. **`profile_embeddings`: build the two-vector form** (`kind IN ('identity','preference')`, PK `(user_id, kind)`) — the revised copy, restated in `candidate_matching.md` §3.
@@ -234,15 +263,14 @@ Useful facts for later steps, learned witnessing Step 2:
 
 | # | Owed | Incurred at | Closed by | Status |
 |---|---|---|---|---|
-| O-1 | `opt_in` observed changing pool membership — Step 4 witnessed the toggle writing to the database, not the difference it makes | Step 4, **2026-09-01** | Step 9 AC4 | **Owed** |
-| O-2 | Pinned-snapshot assertion in `probe_answer_edit.py` | Step 6 | Step 9 (S9-P2) | **Anticipated** |
 | O-3 | Matching vs properly seeded demo profiles | Step 9 | Step 15 | **Anticipated** |
 | O-4 | Native (Windows) run rendering `/health` | Step 1, 2026-09-01 | Owner: Developer Mode + `flutter run -d windows` | **Owed** |
 | O-5 | Step 8 AC2/AC3 UI paths not yet clicked: the optimistic-update ROLLBACK on a forced server error, and the dispute deep-link through to answering the generated question | Step 8, **2026-09-01** | A browser pass with the API forced to fail | **Owed** |
 | O-6 | Step 8 AC4's stale→fresh flip: the header was witnessed in its `failed` state but not observed going "Profile changed" → rebuild → "up to date" | Step 8, **2026-09-01** | A browser pass after an answer edit | **Owed** |
 | O-7 | The fidelity gate re-run **by the owner on the owner's own account**. The gate asks you to count lines *you* would never say; this session could only assess against the account's written answers | Step 8, **2026-09-01** | Owner | **Owed** |
+| O-8 | Step 9's end-to-end witness: ONE clean `probe_matching_filters.py` run from an empty probe pool. The only GREEN run this session was polluted (concurrent runs sharing an output file; stale probe users in the pool; `shared_interests` vacuous under D-009) | Step 9, **2026-09-01** | A single clean run after the OpenRouter daily cap resets (2026-09-02 00:00 UTC) | **Owed** |
 
-*(Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
+*(O-1 closed 2026-09-01 — `opt_in` was observed removing and restoring a candidate in someone else's pool. O-2 closed 2026-09-01 — the pinned-snapshot assertion is enabled in `probe_answer_edit.py` (S9-P2). Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
 ## Probe status (§2)
 
@@ -257,14 +285,28 @@ Useful facts for later steps, learned witnessing Step 2:
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching ← **next** · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness owed O-8)** ← **finish first** · 10 UX dashboard · 11 Simulation + **quota gate opens** · 12 Judge + **quota gate closes** · 13 UX results · 14 Chat · 15 Data hygiene · 16 Witness sweep.
 
 ## Gate register (`ai_interaction.md` §3)
 
 | Gate | Closes in | Status |
 |---|---|---|
 | Fidelity transfer | Step 8 | **CLOSED 2026-09-01** — see the measurement below |
-| Quota fit | Step 11 → 12 | **Open** |
+| Quota fit | Step 11 → 12 | **Open — but the decisive number is now measured, see below** |
+
+### Quota reality, measured 2026-09-01 (feeds the quota-fit gate)
+
+Both free tiers were hit to exhaustion in one working day:
+
+| Provider | Limit | Evidence |
+|---|---|---|
+| **OpenRouter free models** | **50 requests per DAY, account-wide** | `429 {"message":"Rate limit exceeded: free-models-per-day"}`, `X-RateLimit-Limit: 50`, `X-RateLimit-Remaining: 0`. Resets 2026-09-02 00:00 UTC. **It is account-wide, not per model** — switching between `dots-3-note-preview` and `nemotron-3-super` made no difference, which is how it was identified. |
+| **google `gemini-3.6-flash`** | ~20/day (behaves as daily) | Step 6; the reason chat moved off google entirely |
+| **google `gemini-embedding-001`** | low per-minute cap | Step 2; still live, embeddings remain on google |
+
+**What 50/day buys:** one onboarding costs 2 calls (extract + compile). `probe_matching_filters.py` costs ~6. `probe_answer_edit.py` costs 4. **A day of development is ~10 probe runs before everything stops.** That is the quota-fit answer for the free tier, and it is a development-velocity problem before it is ever a product problem.
+
+**The remedy is named in the 429 itself:** adding 10 credits to OpenRouter raises the free-model allowance to **1000 requests/day**. That is an owner decision (the paid-balance question, already in the blocked table) and it is now backed by a number rather than a guess.
 
 ### Fidelity transfer gate — the measurement (S8-G1, Step 8 AC7)
 

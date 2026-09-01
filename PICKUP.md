@@ -2,7 +2,7 @@
 
 The one document that tells someone with no memory of the last session where this project actually is. Maintained per `development_principles.md` §24, as part of the work — never as a task afterwards.
 
-**Last updated:** 2026-09-01 · **Updated because:** **Step 15 (data hygiene) is BUILT and WITNESSED: both new probes GREEN** — `probe_deletion.py` 17/17 (an entangled candidate-and-match deleted; the receipt matched a hand count; the survivor's analysis carries `removed_candidates: 1`, their dates and chat are gone, the vanished chat is a 404 with a sentence, and all 35 global questions survived) and `probe_demo_seeding.py` 12/12 (a demo user's traits wiped and rebuilt THROUGH the real pipeline with provenance; a third pass a no-op). Three demo profiles exist through the real registration and answer paths. The four-step reconciliation pass runs at boot and logs a no-op line per step on a healthy database; a planted embedding-model mismatch was logged loudly and marked stale. D-015 found and closed. Steps 13 and 14 before it: built, tested on mocks, server sides witnessed; browser passes owed (O-16). Both gates CLOSED.
+**Last updated:** 2026-09-01 · **Updated because:** **Step 16, the witness sweep, has been run as far as it can be without a human at the keyboard or a cold-stack wipe — and the honest report is at the bottom of this file.** On this volume: `/docs` drift ZERO (28 promised endpoints, all served), the wire privacy audit 10/10 against raw bodies, one full date reconstructed from the log alone, and seven of nine probes GREEN this session (pool expansion, judge, deletion, demo seeding re-run today; onboarding, answer-edit and simulation-resume GREEN earlier today; matching's clean run still O-8; structured guard GREEN in Step 2). Steps 13–15 landed this session. What remains owed is named, with a cost, in the Owed table.
 
 ---
 
@@ -32,7 +32,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule: `C:\src\flutter\bin\flutter.bat run -d web-server --web-port 5000 --web-hostname 127.0.0.1`, then open `http://127.0.0.1:5000`. First compile ~60-90s, blank page until it finishes.
 
-**Next: Step 16 — the witness sweep and the honest report.** Nothing new is designed there. Steps 1–8, 10, 12 and 15 are done and witnessed; Step 9 is code-complete with its witness OWED (O-8); Step 11 is built with its central claim witnessed; **Steps 13 and 14 are built, tested on mocked data, and wire-verified — their signed-in browser passes are OWED (O-16)**. Both gates are closed. Nine probes exist; seven are GREEN on this volume, one (matching) is owed a clean run, one (structured guard) was GREEN in Step 2.
+**Next: the owner's turn.** Every step is built. Steps 1–8, 10, 12 and 15 are witnessed whole; Step 9's clean matching run (O-8), Steps 13–15's signed-in browser pass (O-16/O-20), Step 14's live compaction (O-19), and the cold-stack probe sweep (O-21) are the open witnesses, and each is priced in the Owed table. The demo profiles mean a real account can run an analysis and find three people — that is O-3, now unblocked.
 
 ---
 
@@ -85,6 +85,7 @@ dating_app_ai\                      ← superproject
 | Step 13 UX results | **Built; tested on MOCKED data (19 widget tests); wire verified on real data; server-side resume WITNESSED over HTTP.** The signed-in browser pass is owed (O-16) — see the Step 13 section | `flutter test` 19/19, `flutter analyze` clean, curl against the running stack, api logs |
 | Step 14 chat | **Built; server side WITNESSED over HTTP** (selection 201, `already_selected` 409 and `not_a_candidate` 404 as state, one real reply with no `state` on the wire, forced give-up → 502 with the user's message not stored, end → 409 `chat_ended` with history readable). UX tested on MOCKED data (7 widget tests). **Compaction not witnessed live (O-19)**; browser pass owed (O-16) | curl, api logs, psql; `flutter test` 25/25 |
 | Step 15 data hygiene | **Witnessed, all 8 ACs** — `probe_deletion.py` GREEN 17/17, `probe_demo_seeding.py` GREEN 12/12, the four-step pass a no-op on a healthy boot, the planted embedding mismatch logged and marked stale, `scan_dead_data.py` reporting 6 items and deleting nothing. UI (delete flow with receipt, tombstones, the vanished chat) widget-tested on mocks; browser pass owed under O-16 | probe verdicts, api logs, psql; `flutter test` 29/29 |
+| Step 16 witness sweep | **Run as far as a session without a human can take it** — see the Step 16 section: drift 0, privacy 10/10, log reconstruction done, 7/9 probes GREEN today, the flag and give-up sweeps tabulated with each observation's source. The cold-stack sweep (O-21) and the browser passes (O-16/O-20) need the owner | this session's tool output, retained in the sections below |
 | Unit tests | **Server 118 pass** (6 new in `tests/test_deletion_graph.py` — the cascade graph walked from the ORM metadata and every reached table asserted counted) · **UX 29 pass** (4 new in `test/step15_hygiene_test.dart`) | in-container `pytest`; `flutter test` |
 | Lint / build | **GREEN, no outstanding errors.** The long-standing `RUF100` in `migrations/env.py` was removed 2026-09-01 — the suppression named `E402`, which this project does not enable, so the suppression was itself the only lint error in the repo. The reason it documented is kept as a plain comment | in-container `ruff check .` |
 | Remotes | All three repos pushed to GitHub (superproject `dating-app`, `dating-app-server`, `dating-app-ux`) | push output 2026-09-01 |
@@ -426,9 +427,100 @@ Fixing the server half first is exactly why the symptom survived into a second a
 | 8 `scan_dead_data.py` reports without deleting | **Witnessed** — 6 items (1 failed snapshot, 2 snapshots stuck `compiling` — left by processes this session's reloads killed mid-call —, 3 failed analyses from the Step 9/11 quota days), nothing deleted |
 
 
+## What was just finished (Step 16 — the sweep, as far as it goes without a human)
+
+Nothing new was designed. Two audit scripts were added because §14 says a promise must be greppable and §6 says a claim must match its evidence: `scripts/check_docs_drift.py` (every endpoint named in a module plan's table, against the live `/openapi.json`) and `scripts/audit_wire_privacy.py <email>` (the five §6 rules against RAW response bodies). Both are re-runnable in seconds and cost no model calls.
+
+### S16-B1 — the probe set, on THIS volume (not a cold stack — see O-21)
+
+| Probe | Verdict | When | Cost |
+|---|---|---|---|
+| `probe_structured_guard.py` | GREEN | Step 2 (earlier today) | a few forced calls |
+| `probe_pool_expansion.py` | **GREEN — re-run this session** | now | 0 |
+| `probe_answer_edit.py` | GREEN | Step 6/9 (earlier today) | several extractions |
+| `probe_onboarding.py` | GREEN 16/16 | Step 7 (earlier today) | 2 |
+| `probe_matching_filters.py` | **not GREEN on clean data — O-8** | — | ~10 |
+| `probe_simulation_resume.py` | GREEN 23/23 | Step 11 (earlier today) | a full analysis |
+| `probe_judge.py` | **GREEN 9/9 — re-run this session** (92.75 recomputed; re-judge delta 2.75) | now | 1 |
+| `probe_deletion.py` | **GREEN 17/17 — this session** | Step 15 | 0 |
+| `probe_demo_seeding.py` | **GREEN 12/12 — this session** | Step 15 | 3 |
+
+**Why not a cold stack.** `docker compose down -v` destroys the volume that holds the owner's own account, the twelve real transcripts Steps 13–14 were built against, and the probe accounts named in this file. That is the owner's decision to make, not a session's (O-21). Every probe above is written to be runnable against the cold stack when it is made.
+
+### S16-B2 — the §8 flag sweep: each observed behaving both ways
+
+| Flag / gate | Off / in one state | On / in the other | Where recorded |
+|---|---|---|---|
+| `opt_in` | a candidate removed from someone's pool | restored to it | Step 9, O-1 closed |
+| `is_demo` | `false` on every real user's payload | `true` on `/me`, candidates and chat matches for the three demo profiles — checked on raw bodies by the audit | Step 15; `audit_wire_privacy.py` rule 4 |
+| persona-snapshot gate | a fresh user is `simulatable: false` and calibration refuses `no_persona_yet` | a ready user is matched | Step 7 AC4; Step 9 AC5 |
+| one-active-analysis 409 | second `POST /analyses` → 409 `analysis_in_progress` | none active → 202 | Step 9 AC7 |
+| event cap (3) and no-consecutive | `reason: event_cap_reached` on every roll after the third; `no_consecutive_events` on the roll after each | events fired at rolls 0.0779, 0.0476, 0.1336 | Step 11 AC3; reconstructed below |
+| `pool_exhausted` | batches 1–6 served | batch 7 the exact payload | `probe_pool_expansion.py`, re-run today |
+| transcript metadata toggle | badges gone, preference stored `false`, honoured on a cold start | badges present by default | **widget-tested both ways** (Step 13 AC3); the browser flip is part of O-16 |
+| `/simulate` on `failed` | refused when the failure was in matching (409, "start a new one") | accepted and RESUMED when candidates exist | Step 13 AC8 (server), `simulate_refusal()` tests |
+| chat selection gate | `already_selected` 409, `not_a_candidate` 404 | `complete` + candidate → 201 | Step 14 AC1 |
+| embedding-model consistency | `reconcile_embeddings_noop` on a healthy boot | a planted mismatch logged at ERROR and marked stale | Step 15 AC6 |
+
+### S16-B3 — the §17 give-up sweep: each observed firing once
+
+| Give-up | Observed | Where |
+|---|---|---|
+| 3 validation-repair attempts → typed error | `outcome: gave_up` with the raw output attached, mid-date (a whitespace loop) | Step 11 AC5, unforced |
+| 3 attempts per simulation turn → date `incomplete`, pipeline moves on | `failed_at_seq: 21`, then date 2 started | Step 11 AC5 |
+| one queued follow-up extraction, never a pile-up | `[(200,'done'), (200,'queued')]`, one follow-up | Step 6 AC6; 4 unit tests |
+| one active analysis per user | the 409 | Step 9 AC7 |
+| rate-limit backoff (20 s, 30 s) then a typed error | google embedding cap, Step 11 | PICKUP quota section |
+| chat reply give-up → 502, user message NOT stored | forced with a nonexistent model | Step 14 AC5 (after D-014) |
+| demo pipeline: one attempt per boot, `deferred` on a held lock | `demo_pipeline_failed … retried on the next boot`; `deferred` path added after D-015 | Step 15 |
+| poller `kick()` window (30 s) then stop | **unit-tested**, not observed live | D-013 |
+
+### S16-B4 — the §14 greppability audit, the four named accretion risks
+
+| Promise | Code |
+|---|---|
+| answer-edit staleness cascade (edit → traits → hash → embeddings → snapshot banner) | `app/answers.py` (`save_answer`, logs the traits sourced from the edited answer) → `app/extraction.py` → `app/traits_hash.py` → `app/matching.py:190` (`live_hash` vs stored) → `app/persona.py:431` (`is_stale`) → `ux/lib/features/traits/profile_screen.dart` header |
+| incomplete-date judging policy (≥10 turns, 0.5 weight) | `app/simulation.py:141` (`JUDGEABLE_MIN_TURNS = 10`), `app/judging.py:84` (`PARTIAL_WEIGHT = 0.5`), `:109` (`is_judgeable`), `:129` (`candidate_score`); shipped as `excluded_from_score`, recomputed by the results screen |
+| no-consecutive-events rule | `app/simulation.py` `should_inject_event` — `reason: no_consecutive_events` in every roll line; 29 unit tests |
+| survivor-side tombstones after a deletion | `app/routers/analyses.py:128` (`candidate_count` → `removed_candidates`), `ux/lib/features/home/home_screen.dart` (`removedCandidatesSentence`, used by three screens), `ux/lib/features/chat/chat_screen.dart:239` (the vanished chat) |
+
+Every module plan's "Locked by this document" list was walked while its step was built; the inline "Built 2026-09-01" notes in each plan are the trail.
+
+### S16-B5 — the §7 log reconstruction test
+
+**Date `f5a1277d` (analysis `c8e3d56b`), from `docker compose logs api` alone, no debugger, no database:** started `running`; the first roll (0.7516) logged `no_messages_yet`; turn 1 by `user_agent`; roll 0.0779 HIT before seq 2 ("They start by assessing the bike's condition…"); the next roll logged `no_consecutive_events`; turns 3–5; roll 0.0476 HIT before seq 6 ("A stubborn bolt…"); `no_consecutive_events` again; turns 7–12 with rolls 0.3179–0.9913 all `roll_missed`; roll 0.1336 HIT before seq 13 ("Dan recalls a detail…"); from seq 15 on every roll logged `event_cap_reached`; turns 14–19; `date_finished status=complete ended_by=cap messages=19 events=3` — 16 agent turns plus 3 events, the derived maximum; `date_judged criteria={90, 90, 95, 0} score=92.75`; `candidate_scored final_score=92.75 date_scores=[92.75] dates_excluded=0`. **Why it ended:** the turn cap. **Why it scored 92.75:** 0.3×90 + 0.3×90 + 0.25×95 + 0.15×(100−0). Every number is in a line.
+
+**Date `4d0b082c` (analysis `8ae03783`):** `date_not_judged … messages: 11, turns: 9, threshold: 10, counted: "agent turns, not rows", reason: "too few turns to be a date"`, and the candidate's `candidate_scored … dates_excluded: 1`. **Why it was not scored:** nine turns under a threshold of ten, with the unit named.
+
+**Date `8fc67efa` (analysis `fd018e9d`):** 27 turn lines, `date_finished ended_by=cap messages=30 events=3` (the old 30-row cap, before the revision), judged 89.4, `candidate_scored final_score=89.4`.
+
+Three dates, three different outcomes, each reconstructed. The log retained by the container reaches back only to its last recreation, so older dates are reconstructible only from `PICKUP` — trap 28.
+
+### S16-B6 / B7 / B8 / B11
+
+- **`/docs` drift: ZERO.** 28 endpoints promised across six plans, all served; 5 additive endpoints not named in a table (`GET /health`, `/calibration/flags/count`, `/calibration/sessions/{id}/messages`, `/profile/extract/status`, `POST /traits/{id}/confirm`) — allowed by `communication_protocol.md` §7.
+- **Wire privacy: 10/10** on 27 raw bodies of an account with eight transcripts and two chats — no `system_prompt`, no trait `description`/`answer_text` in analysis payloads, no `state` in any chat body, `is_demo` everywhere a person is rendered, no stranger's user id, and `state`/`connection`/`satisfaction` present on transcripts and NOWHERE else.
+- **English-only:** no non-English letters in prompts, UI copy, seeds or routing (the only non-ASCII in the seeds is two Romanian city names, which are names).
+- **Dead data:** `scan_dead_data.py` reports 6 items — 1 failed snapshot (a forced failure from Step 7's AC5), 2 snapshots stuck `compiling` (killed by this session's reloads mid-call), 3 failed analyses (Step 9/11 quota days). Nothing deleted; the decision is the owner's.
+
+### S16-B13 — the §6 reckoning
+
+| Claim | Definition-of-done points true |
+|---|---|
+| Steps 1–8, 10, 12, 15 | 1–10: written, tested, logged, witnessed on the stack on a second run, probed, failure modes observed, trades named, defects filed, PICKUP current, reported in these words |
+| Step 9 (matching) | 1, 2, 3, 7, 8, 9, 10; **4/5/6 owed** — the one GREEN run was polluted; a clean `probe_matching_filters.py` run is O-8 |
+| Step 11 (simulation) | 1–10 for the central claim (resume witnessed four times); **AC6 and AC7 owed by owner decision** (O-13, O-14) |
+| Step 13 (results UX) | 1, 2, 3, 7, 8, 9, 10; server halves witnessed over HTTP; **the signed-in browser pass owed** (O-16) |
+| Step 14 (chat) | 1, 2, 3, 5 (server), 7, 8, 9, 10; selection, reply, give-up and end witnessed over HTTP; **compaction live owed** (O-19); browser pass owed (O-16) |
+| Step 16 | run as far as it goes; **the cold-stack sweep owed** (O-21) |
+| Both gates | closed with numbers (fidelity: 1 clear failure in 6; quota: 59 calls, 7 m 13 s, zero retries) |
+
+**"Works" is claimed for:** registration, the questionnaire and its resume, extraction, persona compilation, calibration, the dashboard, the reveal, a simulated date that resumes after a kill, judging and scoring, the results and transcript payloads, chat selection/reply/end, account deletion with its receipt, demo seeding, and the four-step reconciliation pass. **"Built, not yet witnessed" is the honest phrase for:** the Step 13–15 screens in a signed-in browser, live chat compaction, the clean matching run, the two deferred Step 11 criteria, and the whole suite against a cold stack.
+
+
 ## What is next
 
-**Step 16 — the witness sweep and the honest report — is next.** Its inputs are all here: nine probes (`probes/`), the §8 flag list, the §17 give-up list, each module plan's "Locked by this document" list, `/docs`, and the Owed table below. What it will find, said now so nobody is surprised: O-8 (a clean `probe_matching_filters.py` run) is the one genuinely open probe; O-16 is the signed-in browser pass for Steps 13–15 and needs a human at the keyboard; O-19 (compaction live) costs 30+ calls; O-3 (matching against the demo profiles) is now UNBLOCKED — three opted-in demo profiles with ready snapshots exist, so an analysis from any real account will find them.
+**All sixteen steps are built. What remains is witnessing that needs the owner:** O-8 (one clean matching run, ~10 calls), O-16/O-20 (the Steps 13–15 screens signed in — the trap-3d recipe with `probe-sim-alice-4aa682e1@probe.dev` / `probe-password`, or the owner's own account), O-19 (a long chat, 30+ calls), O-21 (the nine probes against a cold stack — destroys this volume; take a `pg_dump` first if the transcripts matter), and O-3 (an analysis from a real account against the three demo profiles — the product's first real run, ~20 calls, and the most informative thing left to do).
 
 **Before the Step 13 browser pass (O-16):** run `flutter build web` in `ux/`, `python serve_build.py 5000`, sign in as `probe-sim-alice-4aa682e1@probe.dev` / `probe-password` (owns five complete analyses, one with a partial and an excluded date: `2b83aeab`), and walk the eight ACs above. It is the same trap-3d recipe as Steps 8–11.
 
@@ -514,6 +606,7 @@ Two things do NOT follow the dates-per-candidate knob and need a human:
 25. **A probe must call `setup_logging()` or the §7 lines go nowhere** (D-015). Two RED runs of `probe_demo_seeding.py` were spent reading PASS/FAIL lines that could not say why, while the `extraction_queued` line that named the race was being written to an unconfigured logger.
 26. **Edit `app/models.py` and run `alembic upgrade head` in the same breath.** uvicorn reloads on the save, the ORM asks for the new column, Postgres does not have it, and startup fails — `/health` then answers nothing until `docker compose restart api`. The container's own start command migrates before it serves; a reload does not.
 27. **Never launch the demo pipeline in the background and then run it again inline** — that is a race against the per-user extraction lock (D-015). `run_full_pass(app, inline_demo_pipeline=True)` is the scripted form; the background form is boot's alone.
+28. **`docker compose logs api` reaches back only to the container's last recreation.** A `restart` keeps the log; `up -d` after a Dockerfile change, or `down`, starts it over. The §7 reconstruction test could be run on three dates this session because the container had lived through them; anything older is reconstructible only from this file. If log history matters, ship the JSON lines somewhere before recreating the container.
 
 ## Owed measurements (§4)
 
@@ -534,6 +627,7 @@ Two things do NOT follow the dates-per-candidate knob and need a human:
 | O-18 | The Claude Design restyle of the results screens (`Ranking & Date Reveal.dc.html`). Every route to the design file was closed to this session — `/design-login` must be run from an interactive session first | Step 13, **2026-09-01** | Owner: `/design-login`, then import and restyle | **Owed** |
 | O-19 | Step 14 AC4 — compaction observed live: a chat driven past 40 messages, the `chat_compacted` line with its folded range and summary length, and coherent replies across the fold. Unit-tested at the boundary; the live run costs 30+ model calls | Step 14, **2026-09-01** | One long chat once quota allows, or a probe that seeds 41 rows directly and sends one message (1 compaction + 1 reply call) | **Owed** |
 | O-20 | Step 15's UI (the delete flow with its receipt, the tombstones on the dashboard/reveal/results, the vanished-chat screen) in a signed-in browser. Widget-tested on mocks; the server halves witnessed by the probes | Step 15, **2026-09-01** | Part of the O-16 browser pass; a probe account can be deleted through the UI for the receipt | **Owed** |
+| O-21 | Step 16 S16-B1 as written: all nine probes in one session against a COLD stack (`docker compose down -v`). Not done because it destroys the volume holding the owner's account and the transcripts Steps 13–14 were built against | Step 16, **2026-09-01** | Owner: `pg_dump` if the data matters, then `down -v`, `up -d`, and the nine probes in the order of the probe table | **Owed — owner's decision** |
 
 *(O-10, O-11 and O-12 were incurred and closed within the same session and is deleted per the queue rule: O-10 closed on the third run of `probe_simulation_resume.py`, GREEN at 23/23; O-11 closed when a sixth date ended itself by mutual `wants_to_end` at 25 messages with a clean two-line goodbye; O-12's narrowed halves — a transient fault exhausting the 3-attempt ladder, and the pipeline starting the next date after an incomplete one — were both observed unforced when the model emitted a degenerate whitespace loop mid-date.) (O-1 closed 2026-09-01 — `opt_in` was observed removing and restoring a candidate in someone else's pool. O-2 closed 2026-09-01 — the pinned-snapshot assertion is enabled in `probe_answer_edit.py` (S9-P2). Step 6's O-5 and O-6 were incurred and closed the same day — AC5 witnessed by replacing an answer's whole subject, AC6 witnessed live after the move off google — and are deleted per the queue rule. Earlier: O-5 — the Step 2 live-call ACs — was closed 2026-09-01 and deleted per the queue rule: keys arrived, both probes ran GREEN, the config-only model swap and the 429→backoff→typed-error path were both observed in the logs.)*
 
@@ -554,7 +648,7 @@ Two things do NOT follow the dates-per-candidate knob and need a human:
 
 ## Module build order
 
-1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation **(built; resume WITNESSED; O-13/O-14 deferred)** · 12 ~~Judge~~ **(done, all 7 ACs; quota gate CLOSED)** · 13 ~~UX results~~ **(built + tested on mocks; browser pass OWED O-16)** · 14 ~~Chat~~ **(built; server witnessed; compaction OWED O-19)** · 15 ~~Data hygiene~~ **(done, all 8 ACs; both probes GREEN)** · 16 Witness sweep ← **next**.
+1 ~~Foundations~~ **(done; O-4)** · 2 ~~AI Interaction~~ **(done)** · 3 ~~Schema + reconciliation~~ **(done)** · 4 ~~Accounts~~ **(done; O-1)** · 5 ~~Questions & answers~~ **(done)** · 6 ~~Trait extraction~~ **(done)** · 7 ~~Persona & snapshots~~ **(done)** · 8 ~~UX profile + fidelity gate~~ **(done; gate CLOSED)** · 9 Matching **(code complete; witness OWED O-8)** · 10 ~~UX dashboard~~ **(done; O-9)** · 11 Simulation **(built; resume WITNESSED; O-13/O-14 deferred)** · 12 ~~Judge~~ **(done, all 7 ACs; quota gate CLOSED)** · 13 ~~UX results~~ **(built + tested on mocks; browser pass OWED O-16)** · 14 ~~Chat~~ **(built; server witnessed; compaction OWED O-19)** · 15 ~~Data hygiene~~ **(done, all 8 ACs; both probes GREEN)** · 16 Witness sweep **(run on this volume; cold-stack sweep OWED O-21)**. **Nothing is left to build.**
 
 ## Gate register (`ai_interaction.md` §3)
 

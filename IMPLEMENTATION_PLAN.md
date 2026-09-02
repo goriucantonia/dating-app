@@ -787,8 +787,41 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 | 14 | Chat: selection & conversation | Both | 15 |
 | 15 | Data hygiene | Both | 16 |
 | 16 | Witness sweep & honest report | Both | ship |
+| 17 | Candidate rejection & replacement | Both | — (added from use, 2026-09-02) |
 
 **Parallelisable pairs** (only if two people are working): Steps 2 and 3 are independent. Step 8 (UX) can overlap Step 9 (server). Step 10 (UX) can overlap Step 11 (server).
+
+---
+
+# Step 17 — Turning a candidate down before the dates run (added from use, 2026-09-02)
+
+**Where this came from.** Not from the plan. The owner read a real ranking, saw three people separated by 0.005 with the one person who shared an interest sitting sixth, and asked why the fourth could not be swapped in. `§23` allows a decided thing to be reopened on new information; this is the new information, and it is written down in `DEFECTS.md` as D-016.
+
+**Goal.** Let a person re-cast an analysis before it costs anything — while it is still `matched` and no date has run — without ever padding the pool, erasing the decision, or pretending someone is a match who is not.
+
+### Technical Tasks — server
+
+- **S17-B1** Migration `0010`: `analysis_candidates.status` (`active`|`rejected`) with a CHECK, `rejected_at` with a CHECK tying it to the status, the table-wide `UNIQUE (analysis_id, rank)` replaced by a **partial** unique index over the active rows. `UNIQUE (analysis_id, candidate_user_id)` is left alone — it is what makes re-offering a rejected person impossible by construction.
+- **S17-B2** Extract the scoring loop from `run_matching` into `score_pool(session, router, me, *, exclude, funnel)` — the ONE scoring path — and add `reject_and_replace()` on top of it: mark, re-score with everyone already offered excluded, re-rank 1..n in two phases, update `candidate_count` and `pool_status`.
+- **S17-B3** The two pure gates: `rejection_refusal(status)` (only `matched` proceeds; every other state gets its own sentence) and `would_leave_nobody(active_count, replacement_found)`.
+- **S17-B4** `POST /analyses/{id}/candidates/{user_id}/reject`, synchronous, returning the whole `AnalysisOut`; `_build()` filters to `status='active'`. Named in `candidate_matching.md`'s endpoint table, so it is promised-and-served rather than additive.
+- **S17-P1** `probes/probe_candidate_rejection.py <email>` — the swap, the record, the refusals, and the "cannot be offered twice" rule, over real HTTP, at zero model cost.
+
+### Technical Tasks — UX
+
+- **S17-U1** `AnalysesRepository.rejectCandidate()`; refusals surface as `ApiException` carrying the server's own sentence, never re-worded client-side (`§26`).
+- **S17-U2** "Not this one" on the candidate card, rendered only while the analysis is `matched`; one confirmation naming the two invisible consequences; the outcome said out loud either way (who took the seat, or that nobody did).
+
+### Acceptance Criteria
+
+1. Rejecting a candidate on a `matched` analysis returns the analysis with that person gone and the next-best eligible person in their seat, ranks 1..n by fit.
+2. The rejected row is still in the database as `rejected` with `rejected_at`, and never appears on the wire again.
+3. The swap is not mistakable for a deletion: `candidate_count` follows the active line-up and `removed_candidates` stays 0.
+4. Rejecting the same person twice is a 404 `not_a_candidate`; a later rejection never offers back anyone already turned down.
+5. Every other analysis state refuses with 409 `cannot_reject_now` and a sentence naming that state.
+6. A rejection that would leave nobody is refused with 409 `last_candidate`, and nothing changes.
+7. No model call in the normal case — proven by the api log across a full probe run, not asserted.
+8. The UI confirms before swapping, shows who arrived, and renders every refusal verbatim.
 
 ## Appendix B — What this plan deliberately does not build (this phase)
 

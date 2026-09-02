@@ -332,3 +332,24 @@ The numbered, append-only defect ledger for this project (`development_principle
 
 ---
 
+## D-021 — three candidates were ranked against each other on three different dates, and the screen said they were the same
+
+- **Date:** 2026-09-02
+- **Repo:** multiple
+- **Surfaced in:** use. "Check if the system is currently using the exact same date scenario every time for the same person. That is not the intended design — random date scenarios must be selected, and the exact same date scenario must be run across all candidates so their outcomes can be directly compared."
+- **Mechanism:** Two failures, one of them silent and one of them printed on screen.
+
+  1. **The comparison was never controlled.** `ensure_dates` called `generate_scenarios` **inside** its per-candidate loop, and `build_scenario_request` anchored each call in that pair's `shared_interests` — or, on an empty intersection, in that candidate's own interests. So candidate A got a car meet, B a bookshop, C a climbing gym. `judge_analysis` then scored all three against the same four criteria and `candidate_scores` ranked the numbers side by side. `conversational_flow` at a car meet and `conversational_flow` at a bookshop are not the same measurement, and the difference between two candidates' scores could have come entirely from their settings. The product's central output — a ranking — rested on an uncontrolled variable, and nothing anywhere said so.
+  2. **The results screen asserted the opposite, in words.** The masthead gathered the distinct `settingName`s and, whenever there was more than one, printed `— the same for every candidate` underneath them. Under the per-candidate design that condition was true exactly when the claim was false: the sentence appeared only on analyses where the settings differed. Written for the pre-2026-09-01 design (two shared settings per candidate), left unchanged when the design moved, and rendered to users for a day.
+
+  Also confirmed, and the other half of the report: **there was no random scenario selection anywhere.** The only variation between two analyses for the same person was model sampling at `temperature=0.9` against the same interest list — which reliably lands in the same kind of place.
+- **Discovery method:** A person reading their own results and asking whether the comparison meant anything. No test could have failed: every test asserted the arithmetic over the scores, and the arithmetic was correct. The defect was in what the numbers were arithmetic *about*.
+- **Fix:** One fixture per analysis, drawn in code. `app/date_archetypes.py` holds 16 written-down archetypes; `ensure_analysis_scenarios` draws one (excluding the last `RECENT_ARCHETYPES_AVOIDED = 3` that user has had), generates it in a single call that receives **no** personal detail, stores it on `analyses.scenarios`, and every date copies it. `date_scenarios.v3` replaces `anchored_in_interest` with `archetype`, echoed by the model and verified against the drawn key in code. `GET /analyses/{id}/dates` now ships a `fixture` object and the masthead prints it — and says `— a different one per candidate` on the older analyses, which is what was actually true of them.
+- **Lesson:** Three.
+  1. **A comparison is only as good as what was held still.** Any screen that ranks N things needs an answer to "and what was identical across all N?" — written down, and ideally shipped as data the way `fixture` now is. Nobody asked that question here for two steps.
+  2. **A claim in UI copy is an assertion about data and belongs under the same scrutiny as a computed value.** `— the same for every candidate` was a hard factual claim with nothing checking it, sitting inside an `if` whose condition made it wrong. It should have been read off the server, which is where it now comes from.
+  3. **Personalisation and comparison pull in opposite directions, and the trade has to be chosen out loud.** The interest-anchored scenario was a genuinely good idea for making one date feel real; it was incompatible with ranking three of them, and nothing in either module plan noticed the collision because each was right on its own.
+- **Status:** closed (2026-09-02) in code, tests and documents; **the live witness is owed** — no end-to-end run against real providers has been made since the change (see `PICKUP.md`). Server suite 142 green, UX suite 51 green, `flutter analyze` clean, migration `0011` applied.
+- **Cross-refs:** the 2026-09-02 revision in `date_simulation.md` §2 and its locked list (#5); S11-B2/B3 in `IMPLEMENTATION_PLAN.md`; D-016 (the other case of a score computed from an input nobody had checked).
+
+---

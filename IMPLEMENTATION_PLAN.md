@@ -509,8 +509,8 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 ### Technical Tasks — Server/Backend
 
 - **S11-B1** Alembic migration: `dates`, `date_messages`, and `analyses.progress JSONB`, verbatim from `date_simulation.md` §3.
-- **S11-B2** Scenario generation — one structured AI call per candidate: input `shared_interests` + both users' interest traits; output **1 setting** `{setting_name, description, sensory_details, anchored_in_interest, possible_events[4-6]}`. *(REVISED 2026-09-01, owner decision: one date per candidate. Was 2 distinct settings.)*
-- **S11-B3** The **empty-intersection fallback**: when `shared_interests` is empty, the setting is anchored in the **candidate's** interests, and `anchored_in_interest` records which. *(REVISED 2026-09-01 with S11-B2: the old "one hers, one his" needs two settings.)* This was flagged open in `candidate_matching.md` and closed in `date_simulation.md` §2 — do not leave it to chance.
+- **S11-B2** Scenario generation — one structured AI call per **ANALYSIS**: input **one archetype drawn at random in code** from `app/date_archetypes.py`; output **1 setting** `{setting_name, description, sensory_details, archetype, possible_events[4-6]}`, stored on `analyses.scenarios` and copied onto every candidate's date. *(**REVISED 2026-09-02, owner decision: one random scenario per analysis, identical across all candidates**, so the three scores are a controlled comparison rather than three different experiments — see D-021. The call now receives NO personal detail at all: the fixture is deliberately nobody's, because anchoring it on anyone hands one candidate a home fixture. Previously revised 2026-09-01: one date per candidate, was 2 distinct settings.)*
+- **S11-B3** ~~The **empty-intersection fallback**~~ — **REMOVED 2026-09-02 with S11-B2.** There is no intersection left to be empty: the scenario is drawn from a catalogue and reads no interests at all. What replaces it is the **draw**, and it carries the same do-not-leave-it-to-chance obligation — the archetype is chosen in code, the last `RECENT_ARCHETYPES_AVOIDED = 3` a user has had are excluded from their next draw, and the model echoes the drawn key into `archetype` where `generate_scenarios` verifies and repairs it. `anchored_in_interest` is gone from `date_scenarios.v3`.
 - **S11-B4** The turn loop per date, in the locked order:
   1. Compose context: the agent's **frozen snapshot's** system prompt + scenario description + date-role preamble + the full transcript so far (a whole date is at most 19 rows and fits any context window — **no summarisation inside a date**).
   2. One structured call → `agent_response.v1` through the Guard.
@@ -541,7 +541,7 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 3. Event injection is observed: the roll appears in the logs, an `environment` row exists, the agents' next turns react to it, and the **max-3 and no-consecutive** rules are both observed holding (`§8`, `§14`).
 4. A date ends by mutual `wants_to_end` at least once, and by cap at least once — both endings logged with which mechanism fired.
 5. A forced 3-attempt failure marks that date `incomplete` at its last good message and the pipeline continues to the next date (`§17` observed).
-6. The empty-intersection fallback is exercised with a candidate sharing zero interest labels, producing a setting anchored in the **candidate's** interests, with `anchored_in_interest` naming which one. *(REVISED 2026-09-01 with S11-B2/B3.)*
+6. **Every candidate in one analysis runs the SAME setting**, and two consecutive analyses for the same person draw different archetypes. *(REVISED 2026-09-02 with S11-B2/B3; was "the empty-intersection fallback is exercised…", which no longer exists.)*
 7. The global semaphore of 2 is observed limiting concurrency with three analyses queued.
 8. The quota-fit spreadsheet exists in `PICKUP.md` with real numbers.
 

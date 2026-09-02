@@ -559,13 +559,13 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 ### Technical Tasks — Server/Backend
 
 - **S12-B1** Alembic migration: `date_evaluations` and `candidate_scores`, verbatim from `date_simulation.md` §3.
-- **S12-B2** `judge_rubric.v1` as versioned rubric text in the schema registry.
+- **S12-B2** `judge_rubric.v2` as versioned rubric text in the schema registry. *(REVISED 2026-09-02 with S12-B7: v2 tells the judge to score every date however short and to report its own `confidence`. The four criteria and their four weights are UNCHANGED, so a v1 score and a v2 score are the same arithmetic and the bump re-based nothing.)*
 - **S12-B3** One structured judge call per completed date, at **low temperature**, receiving the transcript **plus both users' trait labels only** — not the full trait text (named trade #5: the judge scores what happened on the date, not what the profiles predicted).
-- **S12-B4** Judge output: `trait_alignment`, `conversational_flow`, `mutual_engagement`, `clash_severity` (0–100 each), plus `clicked_subjects[]`, `clashes[{user_trait, candidate_trait, moment}]`, `per_peer_summary`, `verdict_summary`.
+- **S12-B4** Judge output: `trait_alignment`, `conversational_flow`, `mutual_engagement`, `clash_severity` (0–100 each), plus `clicked_subjects[]`, `clashes[{user_trait, candidate_trait, moment}]`, `per_peer_summary`, `verdict_summary`, and — **added 2026-09-02** — `confidence` (0–100) and `evidence_note`.
 - **S12-B5** **The number is computed in code, never asked from the model:**
   `date_score = 0.30·trait_alignment + 0.30·conversational_flow + 0.25·mutual_engagement + 0.15·(100 − clash_severity)`.
 - **S12-B6** `candidate_score = mean(date_scores)`, with **incomplete-but-judged dates weighted 0.5**.
-- **S12-B7** The incomplete-date policy, exact (`§14` names it as an accretion risk): an `incomplete` date with **≥10 agent TURNS** is judged and flagged `is_partial`; **under 10 turns** it is excluded from scoring and shown as failed. *(Revised 2026-09-01, owner decision: the threshold counted transcript ROWS, which let three environment events promote a 7-turn fragment over a 9-turn one. Environment rows are scenery — nobody spoke. It now reads the same `turn_count` the 16-turn date cap does, so the two rules cannot drift apart again. The number 10 is unchanged and the change restores its original stated meaning, "roughly five each".)*
+- **S12-B7** The incomplete-date policy, exact (`§14` names it as an accretion risk): **every date with a transcript is judged**, an `incomplete` one flagged `is_partial` and weighted 0.5; the only exclusion is a date **nobody spoke on**, where there is no text to read. Depth is REPORTED, not used as a gate: the judge returns its own `confidence` (0–100) and an `evidence_note`, stored beside the score and never multiplied into it. *(**REVISED 2026-09-02, owner decision: the ≥10-agent-TURN threshold is REMOVED.** It excluded a sub-10-turn date from scoring and showed it as failed — answering a question about DEPTH with a rule about ADMISSION. A four-turn date is not unjudgeable, it is thinly evidenced, and the honest response is a reading that claims less rather than a refusal to read handed to someone who just watched that date happen. Previously revised 2026-09-01: the threshold counted transcript ROWS, which let three environment events promote a 7-turn fragment over a 9-turn one; the turns-not-rows distinction survives at the new floor.)*
 - **S12-B8** The judge must be able to **decline**: an empty `clashes` array is a valid verdict, and a clash is reported only with a citable moment (`§10` — "be specific" without a way to refuse is an instruction to fabricate).
 - **S12-B9** Store `judge_provider`, `judge_model`, `rubric_version` on every evaluation.
 - **S12-B10** Drive `analyses.status` to `complete` (or `failed`), with the transition and its reason logged.
@@ -584,9 +584,9 @@ Built from nothing against the locked interface in `server/ai_interaction.md` §
 1. `probe_judge.py` prints green on both assertions — rerun tolerance and hand-recomputed score.
 2. A completed analysis has `candidate_scores` for every candidate, arithmetically checkable by hand from the `date_evaluations`.
 3. An incomplete date with 12 messages is judged, flagged `is_partial`, and weighted 0.5 in its candidate's score — checked by hand.
-4. An incomplete date with 6 turns is **excluded** from scoring and surfaces as failed. Both sides of the ≥10 boundary observed (`§18`), and a date whose row count only clears 10 because events padded it is excluded too.
+4. **A 4-turn incomplete date is JUDGED**, carries a low `confidence` and an `evidence_note`, and is included in its candidate's mean. The only date excluded from scoring is one with zero agent turns, and it says so on the wire as `excluded_from_score` with copy that names the real reason. *(REVISED 2026-09-02 with S12-B7; was "an incomplete date with 6 turns is excluded… both sides of the ≥10 boundary observed".)*
 5. At least one judged date returns an **empty** `clashes` array and this is accepted as a valid verdict, not retried into producing something (`§10`).
-6. Every stored evaluation carries its judge model and `judge_rubric.v1`.
+6. Every stored evaluation carries its judge model and its rubric version; new ones say `judge_rubric.v2` and carry a `confidence`, and pre-existing `judge_rubric.v1` rows keep saying v1 with a NULL confidence rather than having one invented for them.
 7. **One full analysis end-to-end has been witnessed on the running stack** — the quota gate closed with real numbers.
 
 ### Dependencies

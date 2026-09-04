@@ -40,6 +40,49 @@ The numbered, append-only defect ledger for this project (`development_principle
 
 ---
 
+## Index
+
+Added 2026-09-04 for navigation only — **no entry was edited, renumbered or removed** (§21). Statuses are copied from the entries themselves; the entry is always the authority.
+
+**One defect is open: D-016.** Six more are closed in code but still owe a live witness — all of them are in the 2026-09-02/03 audit batch, and all of them are priced in `PICKUP.md`'s owed table under **O-24**.
+
+| # | Title, in short | Repo | Status |
+|---|---|---|---|
+| D-001 | A module plan's file-layout block was not treated as a checklist | server | **void** — the draft was discarded; the lesson was retained |
+| D-002 | `flutter create` scaffolded the app into the superproject root | multiple | closed |
+| D-003 | The package build only worked while sibling directories were empty | server | closed |
+| D-004 | A baked site-packages copy of `app` shadowed the bind-mounted live code | superproject | closed |
+| D-005 | A registration that succeeded server-side showed the user nothing at all | ux | closed |
+| D-006 | The Flutter web app could not reach the API: CORS admitted `localhost`, the app only runs on `127.0.0.1` | server → ux | closed |
+| D-007 | Trait extraction grew the profile by one trait per run, on unchanged answers | server | closed |
+| D-008 | One OpenRouter model id is several upstream providers, and one of them broke a whole task | server | closed |
+| D-009 | A prompt fix taught the model to write identifiers into `label`, and a probe passed vacuously over the wreckage | server | closed |
+| D-010 | A log line's own field name collided with the logging helper's parameter | server | closed |
+| **D-011** | **No entry exists.** The number is referenced from `PICKUP.md` (trap 42): a JSONB column stores Python `None` as the JSON value `null`, not SQL NULL, unless you say `JSONB(none_as_null=True)` — so `date_messages.state` read as null everywhere while failing `state IS NULL` in SQL, which is the predicate judging filters spoken turns on | server | **gap in the ledger** — the mechanism and fix are recorded in PICKUP; the entry was never written |
+| D-012 | The D-004 fix was in the Dockerfile but not in the image that was running | server | closed |
+| D-013 | The one poller stops on the terminal status the row still reports for a moment after `POST /simulate` | ux | closed |
+| D-014 | The chat give-up path 500ed: a rollback expired the row the log line was about to read | server | closed |
+| D-015 | The demo-seeding probe raced the pipeline it was testing | server | closed |
+| **D-016** | **Half the compatibility score, and one reason sentence, can be computed from the "No stated preferences yet." placeholder without anything saying so** | server | **OPEN** — nothing is wrong on screen today, but the `fit_forward` reason branch should be guarded before anyone reads a ranking as a measurement |
+| D-017 | The persona's system prompt states the user's name, and nothing re-stated it when they changed it | server | closed |
+| D-018 | The app promised a question it then hid, and had no way back to anywhere | ux | closed |
+| D-019 | The completion banner's button threw, so it neither navigated nor let itself be dismissed | ux | closed |
+| D-020 | The field the whole matching filter turns on could be set once, at registration, and never again | ux | closed |
+| D-021 | Three candidates were ranked against each other on three different dates, and the screen said they were the same | multiple | closed in code, tests and docs; **live witness owed** (O-23) |
+| D-022 | The app's one HTTP client gave up at 30 s on endpoints that run a model call inline | multiple | closed in code; **live witness owed** |
+| D-023 | A cold start sent requests before the token was loaded, and the 401 deleted the saved session | ux | closed in code; **browser witness owed** |
+| D-024 | Nothing re-read the answers after onboarding, `corrected` was never written, and a compile with nothing to compile left no row | multiple | closed in code; **live witness owed** |
+| D-025 | bcrypt 5 raises on a password over 72 bytes; register and login 500ed on a passphrase | server | closed |
+| D-026 | Rejected candidates still went on dates, were judged, and could be picked for a chat | server | closed in code; **test owed** (needs a fake router) |
+| D-027 | A date the provider gave up on was terminal, so "Pick up where it stopped" was a permanent no-op | server | closed in code; **live witness owed** |
+| D-028 | A database error inside a background failure handler crashed the handler, leaving the analysis active until a restart | server | closed in code; **failure-injection tests owed** |
+| D-029 | The 500 envelope left the server without CORS headers; provider failures that were not `AIError` walked past every handler | server | closed in code; **live witnesses owed** |
+| D-030 | The audit fixes shipped with regressions of their own, found only by reviewing the diff the next day | multiple | closed in code; **live witnesses owed** (O-24) |
+
+**What the discovery-method column says about this project, read across all 30.** Nine were found by code review (all in the 2026-09-02/03 audit); seven by a probe or a live run; six by a person simply using the app — D-016 through D-021, five of them in a single afternoon. **Not one of those six could have been found by a test**, and D-020's own lesson says why: the most invisible defects are the ones with no wrong behaviour. That is the standing argument for the browser passes still sitting in PICKUP's owed table.
+
+---
+
 ## D-001 — a module plan's file-layout block was not treated as a checklist
 
 - **Date:** 2026-09-01
@@ -353,3 +396,95 @@ The numbered, append-only defect ledger for this project (`development_principle
 - **Cross-refs:** the 2026-09-02 revisions in `date_simulation.md` §2 and its locked list (#3, #4, #5); S11-B2/B3, S12-B7 in `IMPLEMENTATION_PLAN.md`; D-016 (the other case of a score computed from an input nobody had checked).
 
 ---
+
+## D-022 — the app's one HTTP client gave up at 30 s on endpoints that run a model call inline, and called the server "down"
+
+- **Date:** 2026-09-02
+- **Repo:** `multiple` (the timeout in `ux`; the inline calls in `server`)
+- **Surfaced in:** The 2026-09-02 whole-codebase audit, then confirmed from the api logs: `trait_extraction` latencies of 22–57 s in most calls and 126 637 ms once; `chat_reply` median 6.5 s, max 36 s. PICKUP trap 25 had already written down that a client of `POST /profile/extract` needs a read timeout "well above two minutes" — and the app's own client had 30 s.
+- **Mechanism:** `receiveTimeout: 30s` on the single Dio, no per-call override anywhere; `ApiException.from` mapped every envelope-less failure, timeouts included, to "Couldn't reach the server — is it running?". On the building screen the user was told the server was down while it was mid-extraction; a retry returned `queued` (ignored) and then compiled from zero traits (D-024). In chat, the server committed both rows after the client had withdrawn the bubble and offered a resend — a duplicate.
+- **Discovery method:** Code review, then the numbers from `docker compose logs api`. No test in either repo asserts a client timeout against a real latency.
+- **Lesson:** A trap written in PICKUP for "any HTTP client" has to be checked against the one HTTP client this project ships. Structurally: an endpoint that blocks on a model call should say so in its contract, and the client should carry a per-call timeout for that class (`modelCallOptions`), not one global number. The honest fix is start-then-poll for extraction, like compile; the timeout is the symptom.
+- **Status:** closed in code (`modelCallOptions` 3 min on extract/dispute/chat/calibration/reject; `timeout` named as its own code with its own sentence; `queued` honoured by polling `/profile/extract/status`; chat re-reads `messages?after_seq=` after a timeout before offering a resend). **Live witness owed** — a slow-day extraction through the building screen. Start-then-poll extraction still open.
+- **Cross-refs:** `ux/lib/core/api/api_client.dart`, `ux/lib/features/persona/building_screen.dart`, `ux/lib/features/chat/chat_screen.dart`; D-008 (why extraction is slow), D-024.
+
+## D-023 — a cold start sent requests before the token was loaded, and the 401 deleted the saved session
+
+- **Date:** 2026-09-02
+- **Repo:** `ux`
+- **Mechanism:** The router's redirect returned null while auth was loading, so the requested screen built at once. Home watched the history provider, the poller ticked in its constructor, the chat screen loaded in `initState`; the interceptor read `TokenStore.token`, still null until the async storage read finished, and sent no header. A missing bearer is a 401 like a bad one; the interceptor called `sessionExpired()`, which ran `deleteAll()` on secure storage. The Step 4 "kill and reopen, still signed in" witness survived only because it reloaded during onboarding, where the questions provider is the one provider that waits for auth. Separately, no per-user provider was reset on sign-out, so the next account saw the previous account's traits and history, and a poller for an old id ran for the life of the page, signing the user out again every few seconds on a 401.
+- **Discovery method:** Code review (two independent reviewers reached it), confirmed by tracing the interceptor and the auth controller.
+- **Lesson:** "Nothing works without it" gates need a gate for *auth itself*, not just for onboarding. A 401 is only evidence about the stored session when the request carried that session. And a cache keyed on nothing is keyed on the previous user.
+- **Status:** closed in code (`/splash` route holds every screen until auth resolves and carries the deep link; the interceptor signs out only when the failing request carried the current token; traits/persona/history/chat providers watch `currentUserIdProvider` and do not fetch while signed out; the poller stops on 401/403/404; `clear()` deletes only the JWT key). 54 → 60 widget tests green. Browser witness of a reload on `/analyses/:id/results` owed.
+- **Cross-refs:** `ux/lib/app/router.dart`, `ux/lib/core/api/api_client.dart`, `ux/lib/core/auth/auth_controller.dart`, `ux/lib/core/polling/poller.dart`; D-005 (the same "failure branch you typed" shape).
+
+## D-024 — nothing re-read the answers after onboarding, `corrected` was never written, and a compile with nothing to compile left no row
+
+- **Date:** 2026-09-02
+- **Repo:** `multiple`
+- **Mechanism:** Three gaps in one loop. (1) `POST /profile/extract` had exactly one client caller, the onboarding building screen; a batch, an edit, or a dispute's follow-up answer only invalidated the question list, and the correction screen showed "your profile will be rebuilt with this" with no code behind it (D-018's lesson, recurring). (2) On the server, an `update` verdict kept `status='disputed'`; `corrected` existed in both CHECK constraints and nothing wrote it, so "Being corrected" was permanent; the model was never told which trait a dispute answer was about. (3) `compile_persona` raised before inserting its `compiling` row when traits or answers were empty; the endpoint had already answered `compiling`; the building screen polled a null snapshot for ever, and the empty profile offered no way to run extraction again.
+- **Discovery method:** Code review; the server half by grepping for writers of `corrected` (none).
+- **Lesson:** A status in a CHECK constraint with no writer is a promise nobody kept — grep the enum's writers, not just its readers. A screen that says "will be rebuilt" must be the thing that rebuilds.
+- **Status:** closed in code (expand, edit and correction all route through `/onboarding/building?to=/profile`; dispute rows in the extraction prompt name their handle; an `update` on a disputed trait with an answered question writes `corrected`; `compile_persona` writes a `failed` row and `POST /persona/compile` refuses `409 nothing_to_compile`; the empty profile has "Read my answers now"; the building screen honours `queued`, skips a compile when nothing changed and the persona is fresh, tolerates failed ticks, and gives up after six minutes with words). Live witness of a dispute → answer → `corrected` round trip owed.
+- **Cross-refs:** `server/app/extraction.py`, `server/app/persona.py`, `server/app/routers/persona.py`, `ux/lib/features/questions/*`, `ux/lib/features/persona/building_screen.dart`; D-018.
+
+## D-025 — bcrypt 5 raises on a password over 72 bytes; register and login 500ed on a passphrase
+
+- **Date:** 2026-09-02
+- **Repo:** `server`
+- **Mechanism:** `pyproject.toml` pins `bcrypt>=4.1`; the image resolved 5.0.0, which raises `ValueError` where 4 silently truncated. The password field had a minimum and no maximum. Bytes, not characters: 25 emoji or ~36 accented letters is over.
+- **Discovery method:** Code review, then reproduced live in the container (the register attempt failed inside `hash_password`, before any INSERT).
+- **Lesson:** A floor on a dependency version is a promise about behaviour you did not test. Validate at the boundary in the unit the library counts in.
+- **Status:** closed (`check_password_bytes` on both models → field-level 422; `tests/test_password_bytes.py`; witnessed live: 422 with the field named, CORS headers intact).
+- **Cross-refs:** `server/app/routers/auth.py`.
+
+## D-026 — rejected candidates still went on dates, were judged, and could be picked for a chat; the replacement lost their seat to the cap
+
+- **Date:** 2026-09-02
+- **Repo:** `server`
+- **Mechanism:** Step 17 keeps a rejected row (`status='rejected'`, old rank). `candidate_matching.md` §6.6 warned "every read path must filter on status = 'active' — one more thing to forget", and four had: `ensure_dates`, `judge_analysis`, `GET /analyses/{id}/dates`, and `POST /analyses/{id}/select`. With three dates as the cap, the rejected person took a date and the replacement was skipped with `date_cap_reached`.
+- **Discovery method:** Code review. `probe_candidate_rejection.py` spends zero model calls by design and never simulates after rejecting, so it could not see it.
+- **Lesson:** When a plan says "every read path must filter", the ticket that adds the status has to list the read paths — and a probe that stops before the next stage proves nothing about it.
+- **Status:** closed in code (all four filtered). Test that simulates after a rejection owed (needs a fake router).
+- **Cross-refs:** `server/app/simulation.py`, `server/app/judging.py`, `server/app/routers/simulation.py`, `server/app/routers/chat.py`; D-020, D-021.
+
+## D-027 — a date the provider gave up on was terminal, so "Pick up where it stopped" was a permanent no-op after an outage; a judge failure was a dead end
+
+- **Date:** 2026-09-02
+- **Repo:** `server`
+- **Mechanism:** The give-up ladder marks a date `incomplete`; the resume loop treated `complete`, `incomplete` and `failed` alike as finished; nothing ever moved an `incomplete` date back. Only a date still `running` when the PROCESS died resumed. A daily cap hit at turn 1 produced three empty `incomplete` dates and a `failed` analysis whose retry failed again in milliseconds with zero model calls. Separately, a judge outage landed `complete` with `judged=False` and `/simulate` refused `complete`, so the scores could never be produced. PICKUP's retry witness used a constructed failure whose dates were all `complete`.
+- **Discovery method:** Code review against the plan's own promise ("picks up where it stopped").
+- **Lesson:** A witness on a constructed failure witnesses the construction. The resume contract needs a case for each way a stage can end, not for the one the test could build cheaply.
+- **Status:** closed in code (`_reopen_dead_dates` resets `incomplete` dates with no transcript to `pending` on every pipeline entry, logged `reopened_for_retry`; `simulate_refusal(..., judged=)` admits a `complete` analysis whose judge did not run; 4 new gate tests). Live witness of a genuine mid-date failure resumed through the UI still owed (O-16).
+- **Cross-refs:** `server/app/simulation.py`, `server/app/routers/simulation.py`, `server/tests/test_simulate_retry.py`; D-013.
+
+## D-028 — a database error inside a background failure handler crashed the handler, leaving the analysis in an active state until a restart
+
+- **Date:** 2026-09-02
+- **Repo:** `server`
+- **Mechanism:** After a flush or commit error SQLAlchemy refuses every statement until `rollback()`. Every "owns its own failure" handler went straight to `commit()`, raising `PendingRollbackError` out of its own except block: `simulating` stayed `simulating`; `matching` stayed `matching` — an active state, so `POST /analyses` answered 409 until a restart — and the matching task in the analyses router had no handler at all, so nothing was logged. The date loop's checkpoint writes sat outside the give-up try. Reachable by a candidate deleting their account mid-date (FK violation on the next checkpoint) or a concurrent embedding write. The same shape appeared in the chat give-up (D-014) and was fixed there only.
+- **Discovery method:** Code review.
+- **Lesson:** D-014 was a class, not an instance: every handler that writes a terminal state on a session that may itself be broken must roll back, reload, then write — and be wrapped once more so a second failure is at least logged with the id.
+- **Status:** closed in code (rollback → refresh → write in `run_pipeline`, `start_and_run` and the date loop's `_give_up`; checkpoint writes inside the try; `matching_crashed` logged from the router and reconcile tasks). Failure-injection tests owed.
+- **Cross-refs:** `server/app/simulation.py`, `server/app/matching.py`, `server/app/routers/analyses.py`, `server/app/reconcile.py`; D-014.
+
+## D-029 — the 500 envelope left the server without CORS headers, so the browser app never saw it; provider failures that were not `AIError` walked past every handler
+
+- **Date:** 2026-09-02
+- **Repo:** `server`
+- **Mechanism:** `@app.exception_handler(Exception)` runs in Starlette's outermost `ServerErrorMiddleware`, outside `CORSMiddleware`; a 500 carried no `access-control-allow-origin`, the browser treated it as a network failure, and the client showed "Couldn't reach the server". Inside the AI layer, a 200 with an HTML body, a JSON array, or list-typed content raised `JSONDecodeError`/`AttributeError` — not `AIError` — so the retry ladder, the `ai_call` log line and chat's `except AIError` all missed it; fatal `AIError`s (401, 402, missing key) had no `ai_call` line either; the Google client had no timeout at all. Related, closed with it: extraction could `retract` a confirmed trait (protected on `update` only); disputed traits were compiled into the persona and embeddings as fact; two concurrent chat sends collided on `UNIQUE(session_id, seq)` after waiting the whole first reply; a compaction failure was a raw 500 on every send past the fold; demo accounts could `PATCH`/`DELETE /me`; duplicate registration raced to a 500; email was case-sensitive; clearing your name sent a null that hit NOT NULL; age preferences overflowed int32; zero answers was a 502 "try again".
+- **Discovery method:** Code review, with `httpx.MockTransport` runs against the provider and a scratch-table run for the seq collision; the CORS case verified with a TestClient carrying an Origin header.
+- **Lesson:** A boundary's promise ("SDK/HTTP exceptions must never escape this module") needs a catch-all at the boundary, not a list of the exceptions someone thought of. And the layer a handler runs in decides which headers its response gets.
+- **Status:** closed in code (`InternalErrorEnvelope` ASGI middleware added inside CORS, `tests/test_error_envelope.py`; `execute()` logs fatal errors and wraps anything else as `AIError`; non-JSON/array/list bodies typed as transient; Google `HttpOptions(timeout=120_000)`; confirmed traits retract only when a source answer changed after the confirmation; disputed traits named as denied in the prompt and excluded from embeddings; `SELECT … FOR UPDATE` per chat session plus `409 chat_busy`; a failed fold logs `chat_compaction_failed` and the reply proceeds unfolded; `403 demo_account`; `IntegrityError → 409 email_taken`; `lower(email)` on both paths; `display_name` null → 422; `le=120`; `409 no_answers_yet`; "Value error, " stripped from field messages). Live witnesses owed for the provider cases.
+- **Cross-refs:** `server/app/errors.py`, `server/app/main.py`, `server/app/ai/*`, `server/app/extraction.py`, `server/app/persona.py`, `server/app/matching.py`, `server/app/chat.py`, `server/app/routers/{auth,me,chat,traits}.py`; D-006, D-008, D-014.
+
+## D-030 — the audit fixes shipped with regressions of their own, found only by reviewing the diff the next day
+
+- **Date:** 2026-09-03
+- **Repo:** `multiple`
+- **Surfaced in:** A second-day adversarial review of the uncommitted 2026-09-02 diff (two reviewers, one per repo), run because the fixes had been written fast and witnessed only by the existing suites.
+- **Mechanism:** Seven distinct slips, all in code written to close D-022..D-029. Server: (1) the demo guard helper was inserted between `@router.patch("/me")` and `patch_me`, so the decorator registered the helper — `PATCH /me` no longer existed, and an unauthenticated PATCH answered 422 about a missing query field instead of 401; the suite could not see it because no test touches the route table. (2) `await session.rollback()` expires EVERY loaded object, `expire_on_commit=False` notwithstanding; the give-up path in the date loop and the compaction-failure path in chat both rolled back and then read `analysis`/`user`/`convo` — the very `MissingGreenlet` D-014 documented, now in two more places. A single turn give-up would have failed the whole analysis; a compaction outage would still have 500ed every send. (3) `str_strip_whitespace=True` on `RegisterIn` stripped the password at registration while `LoginIn` did not — a password with edge spaces could never log in. (4) The `?wait=false` branch answered `queued` without calling `queue_follow_up`, so answers written during a run were never re-read. (5) The double-tap handler in `POST /analyses` read `user.id` after its own rollback. Client: (6) a chat send acknowledged by the post-timeout re-read kept its client id, so a LATER identical message replayed the old pair instead of being sent. (7) A poller stopped by a 401 stayed dead after the person signed back in, and a cold-start deep link opened while signed out still lost its target at the login.
+- **Discovery method:** Diff review with the reviewers instructed to be adversarial and to reproduce in the container. The `rollback()` expiry was reproduced on real rows; the route loss was reproduced with curl; the password mismatch with two pydantic calls.
+- **Lesson:** Two structural ones. **A fix is not witnessed by the suite that did not catch the defect it fixes** — the audit fixes were checked against tests that, by construction, did not exercise the paths being changed; a same-day adversarial review of one's own diff is the cheapest witness there is, and should be part of "done" for any batch this size. And **`rollback()` is a session-wide event, not a local undo**: the rule from D-014 ("capture before the rollback, reload after") applies to every object the code goes on to touch, so the safe shape is to roll back only when the SESSION failed (`SQLAlchemyError`), never as a reflex after a model failure that left nothing pending. Mechanically: `tests/test_routes_registered.py` now pins every (method, path, handler) triple and fails on any handler whose name starts with an underscore.
+- **Status:** closed in code (all seven; `test_routes_registered.py` added; server suite 160 green, `ruff` clean; client 60 green, `flutter analyze` clean; `PATCH /me` witnessed answering 401 unauthenticated). Live witnesses still owed with the rest (O-22).
+- **Cross-refs:** D-014 (the rollback lesson, now generalised), D-022..D-029 (the fixes these regressions lived in); `server/app/routers/me.py`, `server/app/simulation.py`, `server/app/chat.py`, `server/app/routers/auth.py`, `server/app/routers/traits.py`, `server/app/routers/analyses.py`, `ux/lib/core/polling/poller.dart`, `ux/lib/app/router.dart`, `ux/lib/features/chat/chat_screen.dart`.

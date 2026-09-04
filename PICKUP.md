@@ -10,7 +10,7 @@ The one document that tells someone with no memory of the last session where thi
 
 **Everything is built. Nothing on the plan is left to write.** Eighteen steps: 1–17 from `IMPLEMENTATION_PLAN.md`, plus Step 18 (navigation) which came from use, not from the plan. What remains is **witnessing** — and every open witness needs either a human at a keyboard or the owner's decision to spend model calls. They are priced individually in "Owed measurements".
 
-**The single most important live fact: the 2026-09-02/03 audit fixes are still UNCOMMITTED in both submodules.** `server` has 26 modified files plus 4 untracked; `ux` has 30 modified. They are green (server 160 pytest, UX 60 widget tests, `ruff` clean, `flutter analyze` clean, migration `0013` applied) and they carry defects **D-022 … D-030**. The next person should read the diff before building on it, and then commit it — an uncommitted tree this large is one accidental `checkout` from gone.
+**The 2026-09-02/03 audit is COMMITTED and PUSHED as of 2026-09-04** — `server` `b1db7bc`, `ux` `2afeb21`, each as one reviewable commit carrying **D-022 … D-030**. It sat uncommitted for two days and no longer does. The LiteLLM provider (**D-031**) is the commit on top of it, `server` `5c6a05f`. All three repos are level with GitHub, and the suite is 205 server pytest / 60 UX widget tests, `ruff` clean, `flutter analyze` clean, migration `0013` applied. **What the audit still owes is its live witnesses, priced under O-24** — none of it has been seen in a browser.
 
 **To run it locally:** `docker compose up -d` (api + db), then from the `ux` submodule:
 
@@ -22,7 +22,7 @@ Then open `http://127.0.0.1:5000`. First compile is 60–90 s and the page is bl
 
 **Standing owner directive (2026-09-01):** the priority is API calls that connect, route correctly, and return simple valid responses. Complex architecture, advanced prompting and model-tier upgrades are decided later, not now.
 
-**Standing model facts.** All eight chat/structured tasks route to **`openrouter/dots-studio/dots-3-note-preview:free`** — `trait_extraction`, `persona_digest`, `judging`, `dispute_followups`, `scenario_generation`, `date_simulation`, `chat_reply`, `chat_compaction`. Every slot in `config/ai.yaml` is filled. **Embeddings are pinned separately and are untouched: `google/gemini-embedding-001` at 768 dims** — a different model on a different quota, because every stored vector must come from one model and OpenRouter serves no embedding equivalent. All pins are provisional; the final tier choice belongs to the gates.
+**Standing model facts.** Since 2026-09-04 there are **three** providers — `google`, `openrouter` and `litellm`, the last being one interface to everything else (Anthropic, OpenAI, Bedrock, Vertex, Groq, Ollama, vLLM …) and reached by writing its model string into a routing line. **Nothing routes to it yet — that is a deliberate owner decision, not an oversight.** All eight chat/structured tasks route to **`openrouter/dots-studio/dots-3-note-preview:free`** — `trait_extraction`, `persona_digest`, `judging`, `dispute_followups`, `scenario_generation`, `date_simulation`, `chat_reply`, `chat_compaction`. Every slot in `config/ai.yaml` is filled. **Embeddings are pinned separately and are untouched: `google/gemini-embedding-001` at 768 dims** — a different model on a different quota, because every stored vector must come from one model and OpenRouter serves no embedding equivalent. All pins are provisional; the final tier choice belongs to the gates.
 
 **How that model was chosen — do not re-guess it, re-measure it.** Of the 18 free OpenRouter models only four advertise `structured_outputs`, and Step 2's smoke-test model `nvidia/nemotron-3.5-lightning` is **not one of them** — pointed at `trait_extraction.v1` it took 211 seconds and returned non-JSON. All four candidates were run against the real schema and the real prompt: `dots-3-note-preview` passed in 28 s with short well-shaped labels; `z-ai/glm-5.2:free` was 429-saturated; `liquid/lfm-2.5-2.6b:free` is too small to trust. **A Step 2 smoke test proves a model answers; it does not prove the model can satisfy THIS schema. Re-measure per task, not per provider.**
 
@@ -45,8 +45,8 @@ dating_app_ai\                      ← superproject
 │   │   ├── models.py · reconcile.py · traits_hash.py · accounts.py · answers.py
 │   │   ├── extraction.py · persona.py · matching.py · simulation.py · judging.py
 │   │   ├── chat.py · demo.py · deletion.py · date_archetypes.py
-│   │   ├── ai\      base.py · google.py · openrouter.py · registry.py
-│   │   │            routing.py · structured.py · resilience.py
+│   │   ├── ai\      base.py · google.py · openrouter.py · litellm_provider.py
+│   │   │            registry.py · routing.py · structured.py · resilience.py
 │   │   ├── routers\ auth · me · questions · traits · persona · analyses
 │   │   │            simulation · chat
 │   │   └── schemas\ the registry + one file per versioned schema
@@ -69,12 +69,30 @@ dating_app_ai\                      ← superproject
 | **Step 14 — chat** | **Built; server side witnessed over HTTP** (selection, refusals as state, a real reply with no `state` on the wire, forced give-up, end). **Compaction not witnessed live (O-19)**; browser pass owed (O-16) |
 | **Step 16 — witness sweep** | **Run as far as a session without a human can take it.** Doc drift 0, wire privacy 10/10, log reconstruction done on three dates, 7/9 probes GREEN. The cold-stack sweep is O-21 |
 | **Step 18 — navigation** | **Built and tested** — one `StatefulShellRoute` with four branches, `BackTo` everywhere, the dispute's own correction screen. 8 tests drive the REAL router |
-| **The 2026-09-02/03 audit** | **Fixed in code and tested; UNCOMMITTED; live witnesses owed (O-24).** See "What was just finished" |
-| **Tests / lint** | Server **160 pytest green**; UX **60 widget tests green**; `ruff` clean; `flutter analyze` clean |
+| **The 2026-09-02/03 audit** | **Fixed, tested, committed and pushed** (`server` `b1db7bc`, `ux` `2afeb21`). **Live witnesses still owed (O-24)** |
+| **AI providers** | **Three**: `google`, `openrouter`, and `litellm` (added 2026-09-04, witnessed live). All eight tasks currently route to openrouter; litellm is wired, tested and proven but nothing routes to it yet |
+| **Tests / lint** | Server **205 pytest green**; UX **60 widget tests green**; `ruff` clean; `flutter analyze` clean |
 | **Migrations** | Through **`0013`**, all applied |
 | **The pool** | **51 people, all matchable** — 50 demo profiles + the owner's account. Plus **36 probe accounts** that are wreckage, not people |
 
 ## What was just finished
+
+### The `litellm` provider (2026-09-04) — built and WITNESSED live
+
+The owner asked for models to be callable through the LiteLLM interface. `app/ai/litellm_provider.py` is a third provider behind the same locked `AIProvider` protocol, so nothing downstream changed: `TaskRouter` resolves it like any other, the Guard is still the only place model JSON is parsed (§16), and a stored artifact still records exactly what made it.
+
+**Added ALONGSIDE the two hand-written clients, not in place of them.** Those two are what this project measured, pinned and closed its gates on, and each encodes upstream knowledge a generic client does not. LiteLLM is the door to everything else — Anthropic, OpenAI, Azure, Bedrock, Vertex, Groq, Together, Mistral, DeepSeek, Ollama, a local vLLM.
+
+**To use it:** uncomment the `litellm` provider in `config/ai.yaml` and point a routing line at it. **The model string IS the routing** — `{ provider: litellm, model: "anthropic/claude-sonnet-4-5" }`. For a self-hosted endpoint add `api_base` (only this provider reads it; the registry refuses it on the other two at startup rather than ignoring it).
+
+**Its key is optional, and that is the one real difference.** LiteLLM resolves a key PER UPSTREAM from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …), so an empty `LITELLM_API_KEY` is normal and is logged at INFO with `key_resolution: provider_env` — not the WARNING the other two get, because a warning that fires every boot is one people learn to skip.
+
+**Witnessed against real providers, not just mocked:** a plain call and a **native** structured call through `gemini/gemini-flash-latest` returning a validated dict; a 768-dimension embedding at L2 norm 1.000000; a real 404 classified fatal and correctly not retried; the env-resolved key path proven through `openrouter/…`; and an OpenRouter upstream fault retried three times as transient before an honest typed give-up. 45 unit tests, none of which touch the network.
+
+**The live call found a real defect on its first attempt — D-031.** LiteLLM flattens OpenRouter's `"Provider returned error"` (the D-008 upstream fault, which `openrouter.py` deliberately treats as *transient*) onto its own `BadRequestError`, and my mapper made it **fatal** — silently undoing D-008 for everything routed through the new provider. Fixed, re-witnessed, and three tests pin it. **The lesson is worth more than the fix: a new provider does not inherit the defect knowledge the old ones encode — it has to re-earn it**, because those classifications are facts about an UPSTREAM, not about the client library that reached it.
+
+**Two operational notes.** `litellm` is a new dependency in `server/pyproject.toml`, so the **image was rebuilt** (`docker compose build api && docker compose up -d api`) — a fresh clone needs the same, and the provider's own ImportError message says so (trap 5). And it is **imported lazily**: the import costs seconds, and the registry builds every configured provider at boot whether or not a task routes to it.
+
 
 ### The demo pool: 3 → 10 → 50 people (2026-09-01 … 09-03)
 
